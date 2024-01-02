@@ -1,0 +1,13 @@
+  
+       XFOIL         Version 6.99
+  
+ Calculated polar for: EPPLER E836 HYDROFOIL AIRFOIL                   
+  
+ 1 1 Reynolds number fixed          Mach number fixed         
+  
+ xtrf =   0.100 (top)        0.100 (bottom)  
+ Mach =   0.000     Re =     0.312 e 6     Ncrit =   9.000
+  
+   alpha    CL        CD       CDp       CM     Top_Xtr  Bot_Xtr
+  ------ -------- --------- --------- -------- -------- --------
+   1.770   0.1875   0.01370   0.00253   0.0005   0.1000   0.1000

@@ -1,0 +1,13 @@
+PLOP
+G 0
+
+LoaD ./temp/avl/soos_hull.avl
+OPER
+A
+A 10.0
+X
+FS ./temp/avl/soos_hull.out
+O
+
+
+quit

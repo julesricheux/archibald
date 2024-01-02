@@ -1,0 +1,82 @@
+18ft_hull
+#Mach
+0.0
+#IYsym IZsym Zsym
+1 0 0.0
+#Sref   Cref    Bref
+0.74  0.55  1.35
+#Xref   Yref    Zref
+0.0     0.0     0.0
+
+#===================================================================
+SURFACE
+daggerboard
+#Nchordwise Cspace Nspanwise Sspace
+3 0 10 0
+
+ANGLE
+0.0
+#===================================================================
+#Xle Yle Zle Chord Ainc Nspanwise Sspace
+
+SECTION
+-2.72 -0.13 0.0 0.4 -0.0 1 0
+AFILE
+./data/airfoils/thick_sections/e836.dat
+SECTION
+-2.7 -0.46 0.0 0.4 -0.0 1 0
+AFILE
+./data/airfoils/thick_sections/e836.dat
+SECTION
+-2.66 -0.78 0.0 0.38 -0.0 1 0
+AFILE
+./data/airfoils/thick_sections/e836.dat
+SECTION
+-2.6 -1.09 0.0 0.33 -0.0 1 0
+AFILE
+./data/airfoils/thick_sections/e836.dat
+SECTION
+-2.5 -1.29 0.0 0.25 -0.0 1 0
+AFILE
+./data/airfoils/thick_sections/e836.dat
+SECTION
+-2.28 -1.41 0.0 0.02 -0.0 1 0
+AFILE
+./data/airfoils/thick_sections/e836.dat
+#===================================================================
+#===================================================================
+SURFACE
+rudder
+#Nchordwise Cspace Nspanwise Sspace
+3 0 10 0
+
+ANGLE
+-1.7820000000000003
+#===================================================================
+#Xle Yle Zle Chord Ainc Nspanwise Sspace
+
+SECTION
+0.02999032758045788 0.010000000000000009 0.0006219350657301733 0.33 -0.0 1 0
+AFILE
+./data/airfoils/thick_sections/e836.dat
+SECTION
+0.039985491370686826 0.24000000000000005 0.0009329025985952599 0.32 -0.0 1 0
+AFILE
+./data/airfoils/thick_sections/e836.dat
+SECTION
+0.05997581895114471 0.47000000000000003 0.001554837664325433 0.3 -0.0 1 0
+AFILE
+./data/airfoils/thick_sections/e836.dat
+SECTION
+0.10995163790228943 0.71 0.0031096753286508666 0.26 -0.0 1 0
+AFILE
+./data/airfoils/thick_sections/e836.dat
+SECTION
+0.1999081120143499 0.8699999999999999 0.0059083831244366464 0.17 -0.0 1 0
+AFILE
+./data/airfoils/thick_sections/e836.dat
+SECTION
+0.35983073265801296 0.95 0.010883863650278032 0.02 -0.0 1 0
+AFILE
+./data/airfoils/thick_sections/e836.dat
+#===================================================================

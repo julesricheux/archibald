@@ -1,0 +1,28 @@
+PLOP
+G 0
+
+LoaD ./data/airfoils/thick_sections/eppler836.dat
+PPAR
+N 200
+t 0.5
+r 0.2
+
+
+OPER
+VISC 10729902.272854725
+VPAR
+n 9
+xtr
+0.1
+0.1
+
+ITER 200
+A 2.522174005020227
+PACC
+./temp/xfoil/soos_hull.out
+
+A 4.241774158935226
+PACC
+
+
+quit
