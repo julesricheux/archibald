@@ -2,7 +2,7 @@
 
 archibald is a performance prediction package for sailboats and ships in the preliminary design stage. It is written in Python 3 and aimed in particular at naval architecture students.
 
-It is under continuous development, but independant modules are ready to be used independently.
+It is still under continuous development, but modules are ready to be used independently.
 In particular, **Rhino and AutoCAD models and drawings can be directly imported for computation**, giving an easy workflow to quickly assess the impact of design choices on performance, and play with it.
 
 ## Examples
