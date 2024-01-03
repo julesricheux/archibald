@@ -26,9 +26,9 @@ import os
 import archibald
 
 from archibald.tools.math_utils import *
-from archibald.tools.doc_utils import *
 from archibald.tools.dyn_utils import *
 from archibald.tools.xfoil_utils import *
+from archibald.tools.geom_utils import *
 
 
 ARCHIBALD_DIR = os.path.dirname(archibald.__file__)

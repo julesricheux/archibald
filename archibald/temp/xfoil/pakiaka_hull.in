@@ -1,0 +1,28 @@
+PLOP
+G 0
+
+LOAD .\data\airfoils\thick_sections\e836.dat
+PPAR
+N 200
+t 0.5
+r 0.2
+
+
+OPER
+VISC 2171832.966303464
+VPAR
+n 9
+xtr
+0.1
+0.1
+
+ITER 200
+A 2.4438169740651547
+PACC
+.\temp\xfoil\pakiaka_hull.out
+
+A 4.109993866055137
+PACC
+
+
+quit

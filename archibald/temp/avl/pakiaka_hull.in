@@ -1,0 +1,13 @@
+PLOP
+G 0
+
+LOAD .\temp\avl\pakiaka_hull.avl
+OPER
+A
+A 10.0
+X
+FS .\temp\avl\pakiaka_hull.out
+O
+
+
+quit

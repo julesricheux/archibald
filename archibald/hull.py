@@ -46,7 +46,7 @@ from archibald.lifting_planes import Centreboard, Rudder
 from archibald.environment import _Environment, OffshoreEnvironment, InshoreEnvironment
 
 from archibald.tools.math_utils import *
-from archibald.tools.doc_utils import *
+from archibald.tools.geom_utils import *
 from archibald.tools.dyn_utils import *
 from archibald.tools.avl_utils import *
 from archibald.tools.xfoil_utils import *
@@ -234,6 +234,7 @@ class Hull():
             
         self.CDv = self.get_CDv
         self.centroid = self.get_centroid
+
 
     def compute_minimal_hydrostatics(self, z=0, heel=0, trim=0):        
         n = set_normal(heel, trim)
@@ -630,7 +631,7 @@ class Hull():
         nu = self.environment.water.nu
         g = self.environment.g
         
-        Loa = self.mesh.bounds[1,0] - self.mesh.bounds[0,0]
+        self.Loa = self.mesh.bounds[1,0] - self.mesh.bounds[0,0]
         # Boa = self.mesh.bounds[1,1] - self.mesh.bounds[0,1]
         volume = self.volume
         cob = self.cob
@@ -653,7 +654,7 @@ class Hull():
         origin = self.hydrostaticData['0L']
         ie = self.hydrostaticData['ie']
         
-        Lbp = Loa # length between perpendiculars
+        Lbp = self.Loa # length between perpendiculars
         Lcb = cob[0]
         lcb = (Lcb-origin)/Lwl - .5
         
@@ -876,8 +877,7 @@ class Hull():
             if Atr == 0.0:
                 return 0.0
             
-            else : 
-                V = V * 0.5144
+            else :
                 FRT = V / (np.sqrt((2 * g * Atr) / (Bwl + (Bwl * Cwp))))
                 if FRT < 5:
                     c6 = 0.2 * (1 - (0.2 * FRT))

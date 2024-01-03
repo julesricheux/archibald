@@ -21,6 +21,9 @@ from archibald.lifting_planes import Centreboard, Rudder
 # Paths to DXF drawings of the appendage plan
 # DXF file should contain exactly two lines or splines, being the leading and trailing edge of the appendage
 
+# PAKI'AKA (wooden 18-foot skiff) appenage plan
+# Drawn by Quentin Germe and Jules Richeux
+
 daggerDxf = './assets/pakiaka_daggerboard.dxf'
 
 nSections = 6

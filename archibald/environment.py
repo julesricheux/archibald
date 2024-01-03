@@ -20,8 +20,7 @@ Further development plans:
 
 import os
 
-from archibald.tools.math_utils import build_interpolation
-from archibald.tools.doc_utils import read_coefs
+from archibald.tools.math_utils import read_coefs, build_interpolation
 
 
 #%% CLASSES

@@ -1,0 +1,62 @@
+pakiaka_hull
+#Mach
+0.0
+#IYsym IZsym Zsym
+1 0 0.0
+#Sref   Cref    Bref
+0.37  0.25  1.47
+#Xref   Yref    Zref
+0.0     0.0     0.0
+
+#===================================================================
+SURFACE
+daggerboard
+#Nchordwise Cspace Nspanwise Sspace
+2 0 10 0
+
+ANGLE
+0.0
+#===================================================================
+#Xle Yle Zle Chord Ainc Nspanwise Sspace
+
+SECTION
+-2.288561318104343 -1.591644650125112 0.0 0.04914727772139882 -0.0 1 0
+AFILE
+c:\users\jrich\documents\archibald\archibald\data\airfoils\thick_sections\e836.dat
+SECTION
+-2.3515769066577508 -1.4317793386807884 0.0 0.15010824217990626 -0.0 1 0
+AFILE
+c:\users\jrich\documents\archibald\archibald\data\airfoils\thick_sections\e836.dat
+SECTION
+-2.3943263731562707 -1.2694091292529899 0.0 0.2096907638856278 -0.0 1 0
+AFILE
+c:\users\jrich\documents\archibald\archibald\data\airfoils\thick_sections\e836.dat
+SECTION
+-2.422918175758108 -1.1072705914114787 0.0 0.24459193447109895 -0.0 1 0
+AFILE
+c:\users\jrich\documents\archibald\archibald\data\airfoils\thick_sections\e836.dat
+SECTION
+-2.4441776648400504 -0.9452694735945404 0.0 0.2675170631644388 -0.0 1 0
+AFILE
+c:\users\jrich\documents\archibald\archibald\data\airfoils\thick_sections\e836.dat
+SECTION
+-2.4610253607305266 -0.7860112894794244 0.0 0.2838089240578143 -0.0 1 0
+AFILE
+c:\users\jrich\documents\archibald\archibald\data\airfoils\thick_sections\e836.dat
+SECTION
+-2.4757821423073754 -0.6215026449785974 0.0 0.2968619749276433 -0.0 1 0
+AFILE
+c:\users\jrich\documents\archibald\archibald\data\airfoils\thick_sections\e836.dat
+SECTION
+-2.4885921099700297 -0.45874466478029086 0.0 0.30738218338157397 -0.0 1 0
+AFILE
+c:\users\jrich\documents\archibald\archibald\data\airfoils\thick_sections\e836.dat
+SECTION
+-2.5005094719267165 -0.2904107829494595 0.0 0.31658668659341593 -0.0 1 0
+AFILE
+c:\users\jrich\documents\archibald\archibald\data\airfoils\thick_sections\e836.dat
+SECTION
+-2.510557197230875 -0.1359250334180138 0.0 0.32369614290593907 -0.0 1 0
+AFILE
+c:\users\jrich\documents\archibald\archibald\data\airfoils\thick_sections\e836.dat
+#===================================================================
