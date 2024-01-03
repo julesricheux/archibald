@@ -22,7 +22,10 @@ import matplotlib.pyplot as plt
     
 
 #%% Sailboat definition
-    
+
+# PAKI'AKA (wooden 18-foot skiff) example
+# Drawn by Quentin Germe and Jules Richeux
+
 sailboat = Sailboat('pakiaka')
 
 #Hull definition
