@@ -33,7 +33,7 @@ Different examples of basic use can be found in /examples/:
 
 - Holtrop and Delft hull resistance method
 - Built-in mesh-based hydrostatics
-- Coupled 
+- Perfect fluid-boundary layer coupling
 
 ## Experimental features
 
