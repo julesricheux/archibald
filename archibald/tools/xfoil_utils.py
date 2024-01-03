@@ -3,9 +3,12 @@
 Created 04/07/2023
 Last update: 03/01/2024
 
+XFoil wrapper for archibald
+
 @author: Jules Richeux
 @university: ENSA Nantes, FRANCE
 @contributors: -
+
 """
 
 #%% DEPENDENCIES

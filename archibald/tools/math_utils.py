@@ -1,20 +1,34 @@
 # -*- coding: utf-8 -*-
 """
-Created on Tue Jul  4 14:16:22 2023
+Created 04/07/2023
+Last update: 10/09/2023
 
-Useful math tools for the VPP.
+Useful math tools for archibald
 
 @author: Jules Richeux
 @university: ENSA Nantes, FRANCE
+
 """
 
 #%% DEPENDENCIES
 
+import csv
 import numpy as np
 import scipy.interpolate as itrp
 
 
 #%% FUNCTIONS
+
+def read_coefs(name, delim=' '):
+    TAB = list()
+    
+    with open(name, 'r') as file:
+        reader = csv.reader(file, delimiter = delim)
+        for row in reader:
+            TAB.append(row)
+            
+    return np.array(TAB)[:,1:].astype('float32')
+
 
 def cosd(a):
     return np.cos(np.radians(a))

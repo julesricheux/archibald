@@ -3,9 +3,12 @@
 Created 04/07/2023
 Last update: 03/01/2024
 
+AVL wrapper for archibald
+
 @author: Jules Richeux
 @university: ENSA Nantes, FRANCE
 @contributors: -
+
 """
 
 #%% DEPENDENCIES

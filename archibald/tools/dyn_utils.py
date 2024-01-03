@@ -3,9 +3,12 @@
 Created 04/07/2023
 Last update: 24/12/2023
 
+Useful fluid dynamics tools for archibald
+
 @author: Jules Richeux
 @university: ENSA Nantes, FRANCE
 @contributors: -
+
 """
 
 #%% DEPENDENCIES

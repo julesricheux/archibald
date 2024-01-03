@@ -1,15 +1,26 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Dec 21 12:04:21 2023
+Created 04/07/2023
+Last update: 03/01/2024
 
-@author: jrich
+Useful geometrical tools for archibald
+
+@author: Jules Richeux
+@university: ENSA Nantes, FRANCE
+@contributors: -
+
 """
+
+#%% DEPENDENCIES
+
 import os
 import numpy as np
 import ezdxf
 
 import scipy.interpolate as itrp
 
+
+#%% FUNCTIONS
 
 def build_spline(control_points, degree, n=200):
 
@@ -153,3 +164,7 @@ def dxf_to_le_chords(filename, nSections, method='bezier'):
             return bezier_to_le_chords(leControl, teControl, nSections)
         else:
             print('Invalid method')
+
+            
+def world_to_vlm(coords3D):
+    return np.transpose(np.vstack([-coords3D[:,0], coords3D[:,2], coords3D[:,1]]))
