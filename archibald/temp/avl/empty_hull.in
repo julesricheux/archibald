@@ -1,0 +1,13 @@
+PLOP
+G 0
+
+LOAD .\temp\avl\empty_hull.avl
+OPER
+A
+A 2.2
+X
+FS .\temp\avl\empty_hull.out
+O
+
+
+quit

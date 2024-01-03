@@ -1,0 +1,114 @@
+pakiaka_rig
+#Mach
+0.0
+#IYsym IZsym Zsym
+0 0 0.0
+#Sref   Cref    Bref
+28.98  3.43  8.46
+#Xref   Yref    Zref
+0.0     0.0     0.0
+
+#===================================================================
+SURFACE
+main
+#Nchordwise Cspace Nspanwise Sspace
+3 0 10 0
+
+ANGLE
+15
+#===================================================================
+#Xle Yle Zle Chord Ainc Nspanwise Sspace
+
+SECTION
+-1.8563111455858812 1.2945151564232 1.8563111455858812 2.7031152214806657 0.0 1 0
+AFILE
+D:\archibald-1.0.0-beta\archibald\data\airfoils\thin_sections\camb_0.33_0.03.dat
+SECTION
+-1.7938966431093268 2.1847921083820774 1.7938966431093268 2.720231790252085 0.00402218983735811 1 0
+AFILE
+D:\archibald-1.0.0-beta\archibald\data\airfoils\thin_sections\camb_0.33_0.041.dat
+SECTION
+-1.713482356341917 3.1415890528042802 1.713482356341917 2.666686172065735 0.030273449666905157 1 0
+AFILE
+D:\archibald-1.0.0-beta\archibald\data\airfoils\thin_sections\camb_0.33_0.052.dat
+SECTION
+-1.6177559468121432 4.109651595692005 1.6177559468121432 2.5605781474398777 0.09859154176169863 1 0
+AFILE
+D:\archibald-1.0.0-beta\archibald\data\airfoils\thin_sections\camb_0.33_0.063.dat
+SECTION
+-1.5118017488244888 5.040389031819687 1.5118017488244888 2.4099052242979955 0.2278564144890316 1 0
+AFILE
+D:\archibald-1.0.0-beta\archibald\data\airfoils\thin_sections\camb_0.33_0.074.dat
+SECTION
+-1.3856321116730097 6.017111436076057 1.3856321116730097 2.207398583035344 0.43637837125445955 1 0
+AFILE
+D:\archibald-1.0.0-beta\archibald\data\airfoils\thin_sections\camb_0.33_0.086.dat
+SECTION
+-1.2506134545046834 6.949421238534968 1.2506134545046834 1.9699475682289276 0.7420599717555357 1 0
+AFILE
+D:\archibald-1.0.0-beta\archibald\data\airfoils\thin_sections\camb_0.33_0.097.dat
+SECTION
+-1.0959035992997348 7.912647987895801 1.0959035992997348 1.6860505371146615 1.1624868714560626 1 0
+AFILE
+D:\archibald-1.0.0-beta\archibald\data\airfoils\thin_sections\camb_0.33_0.108.dat
+SECTION
+-0.9286228219508387 8.859237583215982 0.9286228219508387 1.3729517039345818 1.7149861081261104 1 0
+AFILE
+D:\archibald-1.0.0-beta\archibald\data\airfoils\thin_sections\camb_0.33_0.119.dat
+SECTION
+-0.7838822465181305 9.616463772651883 0.7838822465181305 1.0761250436659888 2.4166666666666665 1 0
+AFILE
+D:\archibald-1.0.0-beta\archibald\data\airfoils\thin_sections\camb_0.33_0.13.dat
+#===================================================================
+#===================================================================
+SURFACE
+jib
+#Nchordwise Cspace Nspanwise Sspace
+2 0 10 0
+
+ANGLE
+10
+#===================================================================
+#Xle Yle Zle Chord Ainc Nspanwise Sspace
+
+SECTION
+-3.869870010639283 0.5685595711578533 3.869870010639283 2.622312114618861 0.0 1 0
+AFILE
+D:\archibald-1.0.0-beta\archibald\data\airfoils\thin_sections\camb_0.33_0.03.dat
+SECTION
+-3.6255182474857577 1.2490224958278398 3.6255182474857577 2.390930787456262 0.0048266278048297315 1 0
+AFILE
+D:\archibald-1.0.0-beta\archibald\data\airfoils\thin_sections\camb_0.33_0.041.dat
+SECTION
+-3.3695306860868266 1.9618884169106823 3.3695306860868266 2.1348216341086146 0.036328139600286184 1 0
+AFILE
+D:\archibald-1.0.0-beta\archibald\data\airfoils\thin_sections\camb_0.33_0.052.dat
+SECTION
+-3.1135431246878955 2.6747543379935257 3.1135431246878955 1.8800685153346572 0.11830985011403833 1 0
+AFILE
+D:\archibald-1.0.0-beta\archibald\data\airfoils\thin_sections\camb_0.33_0.063.dat
+SECTION
+-2.8459197650435586 3.4200232554892254 2.8459197650435586 1.6053249012675792 0.2734276973868379 1 0
+AFILE
+D:\archibald-1.0.0-beta\archibald\data\airfoils\thin_sections\camb_0.33_0.074.dat
+SECTION
+-2.589932203644627 4.132889176572069 2.589932203644627 1.3435017992827611 0.5236540455053513 1 0
+AFILE
+D:\archibald-1.0.0-beta\archibald\data\airfoils\thin_sections\camb_0.33_0.086.dat
+SECTION
+-2.333944642245696 4.84575509765491 2.333944642245696 1.0740144735455646 0.8904719661066427 1 0
+AFILE
+D:\archibald-1.0.0-beta\archibald\data\airfoils\thin_sections\camb_0.33_0.097.dat
+SECTION
+-2.077957080846765 5.558621018737755 2.077957080846765 0.8052750836370786 1.394984245747275 1 0
+AFILE
+D:\archibald-1.0.0-beta\archibald\data\airfoils\thin_sections\camb_0.33_0.108.dat
+SECTION
+-1.8103337212024277 6.303889936233453 1.8103337212024277 0.5165451984354719 2.057983329751332 1 0
+AFILE
+D:\archibald-1.0.0-beta\archibald\data\airfoils\thin_sections\camb_0.33_0.119.dat
+SECTION
+-1.5543461598034967 7.016755857316297 1.5543461598034967 0.21858661712429006 2.8999999999999995 1 0
+AFILE
+D:\archibald-1.0.0-beta\archibald\data\airfoils\thin_sections\camb_0.33_0.13.dat
+#===================================================================

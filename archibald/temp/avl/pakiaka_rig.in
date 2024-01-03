@@ -1,0 +1,13 @@
+PLOP
+G 0
+
+LOAD .\temp\avl\pakiaka_rig.avl
+OPER
+A
+A 0.0
+X
+FS .\temp\avl\pakiaka_rig.out
+O
+
+
+quit

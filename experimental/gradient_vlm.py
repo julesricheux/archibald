@@ -15,9 +15,9 @@ from aerosandbox.aerodynamics.aero_3D.singularities.uniform_strength_horseshoe_s
 from typing import Dict, Any, List, Callable
 import copy
 
-from tools.geom_utils import *
-from tools.math_utils import *
-from tools.dyn_utils import *
+from archibald.tools.geom_utils import *
+from archibald.tools.math_utils import *
+from archibald.tools.dyn_utils import *
 
 
 ### Define some helper functions that take a vector and make it a Nx1 or 1xN, respectively.

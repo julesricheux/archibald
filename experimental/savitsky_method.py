@@ -5,25 +5,23 @@ Created on Tue Dec 26 13:00:42 2023
 @author: Jules
 """
 
+import os
+import sys
+
+__root_dir = os.path.dirname(os.path.abspath(__file__))
+if __root_dir not in sys.path:
+    sys.path.append(os.path.dirname(__root_dir))
+
+import warnings
 import numpy as np
 import scipy.interpolate as itrp
 import scipy.optimize as opt
 
-import os
-import sys
-import warnings
+from archibald.hull import Hull
+from archibald.environment import OffshoreEnvironment
 
-current = os.path.dirname(os.path.realpath(__file__))
-parent = os.path.dirname(current)
-
-if parent not in sys.path:
-    sys.path.append(parent)
-
-from hull import Hull
-from environment import OffshoreEnvironment
-
-from tools.math_utils import *
-from tools.dyn_utils import *
+from archibald.tools.math_utils import *
+from archibald.tools.dyn_utils import *
 
 
 ## SAVISKY COMPUTATION DRAFT
@@ -31,7 +29,7 @@ from tools.dyn_utils import *
 
 
 def get_hydrodynamic_force(V, Lk, Lc, beam, beta, trim, eta, environment=OffshoreEnvironment()):
-    """This function follows Savitsky 1964 and Faltinsen 2005 in calculating the vessel's hydrodynamic forces and moment.
+    """Following Savitsky 1964.
     """
     
     rho = environment.water.rho

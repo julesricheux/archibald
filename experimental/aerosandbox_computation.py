@@ -5,14 +5,22 @@ Created on Thu Dec 21 11:57:11 2023
 @author: jrich
 """
 
-from tools.math_utils import *
-from tools.dyn_utils import *
-from tools.geom_utils import *
+import os
+import sys
+
+__root_dir = os.path.dirname(os.path.abspath(__file__))
+if __root_dir not in sys.path:
+    sys.path.append(os.path.dirname(__root_dir))
 
 import aerosandbox as asb
 import aerosandbox.numpy as asbnp
 
 from gradient_vlm import GradientVortexLatticeMethod
+
+from archibald.tools.math_utils import *
+from archibald.tools.dyn_utils import *
+from archibald.tools.geom_utils import *
+
 
 def update_mast_position(dx,
                          mainLe, mainChords,
@@ -33,6 +41,7 @@ def update_mast_position(dx,
     # Return the updated variables
     return newMainLe, newMainChords, newJibHeadPt, newJibFoot
 
+
 # mainAirfoil = asb.Airfoil("sd7037")
 # jibAirfoil = asb.Airfoil("sd7037")
 mainAirfoil = asb.Airfoil("naca6403")
@@ -41,20 +50,21 @@ jibAirfoil = asb.Airfoil("naca6403")
 # Define rig initial geometry
 nSections = 10
 
-mainDxf = 'D:/000Documents/Cours/DPEA/paki_aka/voilure/gv_rig2.dxf'
-# jibDxf = 'C:/Users/jrich/Documents/paki_aka/voilure/jib1.dxf'
+mainDxf = './assets/pakiaka_mainsail.dxf'
+jibDxf = './assets/pakiaka_jibsail.dxf'
 
 mainLe, mainChords = dxf_to_le_chords(mainDxf, nSections, method='bezier')
+jibLe, jibChords = dxf_to_le_chords(jibDxf, nSections, method='bezier')
 
-# Jibsail rig 2
-jibTackPt = np.array([5.83, 0, 0.58])
-jibHeadPt = np.array([2.24, 0, 6.77])
+# # Jibsail rig 2
+# jibTackPt = np.array([5.83, 0, 0.58])
+# jibHeadPt = np.array([2.24, 0, 6.77])
 
-jibFoot = 3.05
-jibHead = 0.20
+# jibFoot = 3.05
+# jibHead = 0.20
 
-jibLe = np.linspace(jibTackPt, jibHeadPt, nSections)
-jibChords = np.linspace(jibFoot, jibHead, nSections)
+# jibLe = np.linspace(jibTackPt, jibHeadPt, nSections)
+# jibChords = np.linspace(jibFoot, jibHead, nSections)
 
 nChordwise = 20
 nSpanwise = 50
@@ -75,8 +85,8 @@ jibChords = np.linspace(newJibFoot, jibHead, nSections)
 mainLe[:,2] *=1.083
 mainChords *= .8
 
-# mainLe[:,2] *= 0.9394
-# mainChords *= 1.2
+mainLe[:,2] *= 0.9394
+mainChords *= 1.2
 
 
 #Twisting

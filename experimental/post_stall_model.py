@@ -5,6 +5,13 @@ Created on Sat Dec 23 13:02:55 2023
 @author: Jules
 """
 
+import os
+import sys
+
+__root_dir = os.path.dirname(os.path.abspath(__file__))
+if __root_dir not in sys.path:
+    sys.path.append(os.path.dirname(__root_dir))
+
 from aerosandbox import XFoil
 import aerosandbox.numpy as np
 import matplotlib.pyplot as plt
@@ -13,9 +20,7 @@ from aerosandbox.geometry import Airfoil
 import scipy.interpolate as itrp
 from scipy.signal import argrelextrema
 
-from tools.math_utils import *
-
-
+from archibald.tools.math_utils import *
 
 
 if __name__ == '__main__':
@@ -30,7 +35,7 @@ if __name__ == '__main__':
         Re=1e7,
         n_crit=9,
         # hinge_point_x=0.75,
-        xfoil_command = "./xfoil.exe",
+        xfoil_command = os.path.dirname(__root_dir)+"\\archibald\\xfoil.exe",
         # xtr_upper = .1,
         # xtr_lower = .1,
         # max_iter = 100,
