@@ -4,7 +4,7 @@ ENTIRE SHIP DESCRIPTION AND PERFORMANCE COMPUTATION
 NB: NOT YET READY FOR GENERAL USE
 
 Created: 01/07/2023
-Last update: 01/07/2023
+Last update: 03/01/2024
 
 @author: Jules Richeux
 @university: ENSA Nantes, FRANCE
@@ -19,8 +19,11 @@ Further development plans:
     
     - Stabilise the equilibrium computation from response surfaces. In particular,
       errors occur when a parameter goes outside the bounds of response surface.
-      The interpolation method may be changed to an RBF interpolator to increase
-      tolerance and allow for extrapolation. A private 
+      The interpolation method has already been changed to an RBF interpolator
+      to increase tolerance and allow for extrapolation. User should though be
+      warned when etrapolation is used
+      
+    - Test the results on different designs to assess their errors
 """
 
 
@@ -39,7 +42,7 @@ from archibald.hull import Hull
 from archibald.rig import Rig
 from archibald.environment import _Environment, OffshoreEnvironment, InshoreEnvironment
 
-from archibald.tools.doc_utils import *
+from archibald.tools.geom_utils import *
 from archibald.tools.math_utils import *
 
 
@@ -77,24 +80,30 @@ class _Boat():
         
     def build_RS(self, dim, paramRanges, paramN, function, fArgs, dataNames, msg):
         
-        values = [np.zeros(paramN) for j in range(len(dataNames))]
+        # Create the corresponding meshgrid
+        XX = np.meshgrid(*paramRanges)
+        # Combine XX and YY into a (N, p) array
+        X = np.column_stack([xx.ravel() for xx in XX])
+        
+        values = [np.zeros(len(X)) for j in range(len(dataNames))]
         it = np.nditer(values, flags=['multi_index'])
         
-        iterable = tqdm(range(np.prod(paramN)), desc=msg, position=0, leave=True)
+        iterable = tqdm(range(len(X)), desc=msg, position=0, leave=True)
         
         idx = []
         for x in it:
             idx.append(it.multi_index)
         
         for i in iterable:
-            param = [paramRanges[k][idx[i][k]] for k in range(dim)]
+            param = [X[i, k] for k in range(dim)]
             
             data = function(*param, *fArgs)
             
             for j in range(len(dataNames)):
-                values[j][idx[i]] = data[j]
+                values[j][i] = data[j]
         
-        RS = [itrp.RegularGridInterpolator(paramRanges, values[j], method='cubic') for j in range(len(dataNames))]
+        # RS = [itrp.RegularGridInterpolator(paramRanges, values[j], method='cubic') for j in range(len(dataNames))]
+        RS = [itrp.RBFInterpolator(X, values[j], kernel='linear') for j in range(len(dataNames))]
         
         for i, data in enumerate(dataNames):
             self.RS[data] = RS[i]
@@ -107,11 +116,11 @@ class _Boat():
         # heel range from 0 to 90
         
         
-    def build_hull_RS(self, z=0, trim=0):
+    def build_hull_RS(self, n=10, trim=0):
         
-        def function(V, heel, delta, z, trim, method):
-            self.hull.compute_hydrostatics(z, heel, trim)
-            Rt = self.hull.compute_hull_resistance(V, z, heel, trim, delta, method)
+        def function(V, heel, delta, trim, method):
+            self.hull.free_immersion(heel, trim)
+            Rt = self.hull.compute_hull_resistance(V, heel=heel, trim=trim, delta=delta, method=method)
             
             return Rt, self.hull.hydrostaticData['GZt']
         
@@ -119,10 +128,12 @@ class _Boat():
         
         dim = 3
         
-        paramN = np.ones(dim, dtype='int')
-        paramN = np.array([4,4,4])
+        # paramN = np.array([4,3,2])
+        paramN = np.ones(dim, dtype='int') * n
         
-        paramExtrema = np.array([[0,4],
+        vmax = 0.55 * np.sqrt(self.environment.g * self.hull.Loa)
+        
+        paramExtrema = np.array([[0,vmax],
                                 [0,80],
                                 [0,10]])
         paramPowers = np.array([1, 2, 3])
@@ -130,14 +141,14 @@ class _Boat():
                       (paramExtrema[i][1] - paramExtrema[i][0]) + paramExtrema[i][0]
                       for i in range(dim)]
         
-        fArgs = (z, trim, self.method)
+        fArgs = (trim, self.method)
         
         msg = "Building hull response surfaces"
         
         self.build_RS(dim, paramRanges, paramN, function, fArgs, dataNames, msg)
 
         
-    def build_rig_RS(self, beta=None):
+    def build_rig_RS(self, n=10, beta=None):
         
         def function(aws, awa, beta):
             
@@ -153,10 +164,9 @@ class _Boat():
         
         dim = 2
         
-        paramN = np.ones(dim, dtype='int')
-        paramN = np.array([10,12])
+        paramN = np.ones(dim, dtype='int') * n
         
-        paramExtrema = np.array([[0,100],
+        paramExtrema = np.array([[0,20],
                                  [0,120]])
         paramPowers = np.array([1, 1])
         paramRanges = [np.linspace(0,1,paramN[i])**paramPowers[i] *\
@@ -170,7 +180,7 @@ class _Boat():
         self.build_RS(dim, paramRanges, paramN, function, fArgs, dataNames, msg)
         
         
-    def build_appendage_RS(self):
+    def build_appendage_RS(self, n=10):
         
         def function(V, drift, neutralRudder=True, verbose=False):
             if neutralRudder:
@@ -190,10 +200,11 @@ class _Boat():
         
         dim = 2
         
-        paramN = np.ones(dim, dtype='int')
-        paramN = np.array([4,4])
+        paramN = np.ones(dim, dtype='int') * n
         
-        paramExtrema = np.array([[0,4],
+        vmax = 0.55 * np.sqrt(self.environment.g * self.hull.Loa) * 2
+        
+        paramExtrema = np.array([[0,vmax],
                                 [0,10]])
         paramPowers = np.array([1, 3])
         paramRanges = [np.linspace(0,1,paramN[i])**paramPowers[i] *\
@@ -206,7 +217,8 @@ class _Boat():
         
         self.build_RS(dim, paramRanges, paramN, function, fArgs, dataNames, msg)
         
-    def save_RS(self, directory='./saves/', filename=None):
+        
+    def save_RS(self, directory='./archibald_saves/', filename=None):
         # Create the directory if it doesn't exist        
         os.makedirs(directory, exist_ok=True)
         
@@ -220,7 +232,7 @@ class _Boat():
             pickle.dump(self.RS, f)
             
             
-    def load_RS(self, directory='./saves/', filename=None):
+    def load_RS(self, directory='./archibald_saves/', filename=None):
         # Define the file path
         if filename == None:
             filename = self.name+'.pkl'
@@ -241,8 +253,8 @@ class _Boat():
             V = X[0]
             aws, awa = compute_AW(tws, twa, V)
             
-            Fx = self.RS['FxRig']((aws, awa))
-            Rx = self.RS['FxHull']((V, heel, drift)) + self.RS['FxApp']((V, drift))
+            Fx = self.RS['FxRig'](np.array([[aws, awa]]))[0]
+            Rx = self.RS['FxHull'](np.array([[V, heel, drift]]))[0] + self.RS['FxApp'](np.array([[V, drift]]))[0]
             
             return Fx - Rx
     
@@ -250,9 +262,9 @@ class _Boat():
         fArgs = (tws, twa, heel, drift)
         # xBounds = [(1e-3,4)]
         
-        Xopt = opt.fsolve(f, X0, args=fArgs, xtol=1e-5)
+        Xopt = opt.root(f, X0, args=fArgs)
         
-        return Xopt
+        return Xopt.x[0]
     
     def free_speed_heel(self, tws, twa, drift):
         g = self.environment.g
@@ -264,13 +276,13 @@ class _Boat():
             
             # CHECK IF INPUTS ARE INSIDE BOUNDS
             
-            Fx = self.RS['FxRig']((aws, awa))
-            Rx = self.RS['FxHull']((V, heel, drift)) + self.RS['FxApp']((V, drift))
+            Fx = self.RS['FxRig'](np.array([[aws, awa]]))[0]
+            Rx = self.RS['FxHull'](np.array([[V, heel, drift]]))[0] + self.RS['FxApp'](np.array([[V, drift]]))[0]
             
-            HA = self.RS['zCE']((V, drift)) - self.RS['zCLR']((V, drift))
-            GZ = self.RS['GZ']((V, heel, drift))
+            HA = self.RS['zCE'](np.array([[V, drift]]))[0] - self.RS['zCLR'](np.array([[V, drift]]))[0]
+            GZ = self.RS['GZ'](np.array([[V, heel, drift]]))[0]
             
-            Fy = self.RS['FyRig']((aws, awa))
+            Fy = self.RS['FyRig'](np.array([[aws, awa]]))[0]
             
             D = self.hull.displacement
             
@@ -294,11 +306,11 @@ class _Boat():
             V, drift = X
             aws, awa = compute_AW(tws, twa, V)
             
-            Fx = self.RS['FxRig']((aws, awa))
-            Rx = self.RS['FxHull']((V, heel, drift)) + self.RS['FxApp']((V, drift))
+            Fx = self.RS['FxRig'](np.array([[aws, awa]]))[0]
+            Rx = self.RS['FxHull'](np.array([[V, heel, drift]]))[0] + self.RS['FxApp'](np.array([[V, drift]]))[0]
             
-            Fy = self.RS['FyRig']((aws, awa))
-            Ry = self.RS['FyApp']((V, drift))
+            Fy = self.RS['FyRig'](np.array([[aws, awa]]))[0]
+            Ry = self.RS['FyApp'](np.array([[V, drift]]))[0]
             
             eq = np.array([Fx - Rx,
                            Fy - Ry])
@@ -320,7 +332,7 @@ class _Boat():
             V, heel, drift = X
             aws, awa = compute_AW(tws, twa, V)
             
-            print('V', V)
+            # print('V', V)
             # print('heel', heel)
             # print('drift', drift)
             # print('tws', tws)
@@ -330,14 +342,14 @@ class _Boat():
             
             # print(aws, awa)
             
-            Fx = self.RS['FxRig']((aws, awa))
-            Rx = self.RS['FxHull']((V, heel, drift)) + self.RS['FxApp']((V, drift))
+            Fx = self.RS['FxRig'](np.array([[aws, awa]]))[0]
+            Rx = self.RS['FxHull'](np.array([[V, heel, drift]]))[0] + self.RS['FxApp'](np.array([[V, drift]]))[0]
             
-            HA = self.RS['zCE']((V, drift)) - self.RS['zCLR']((V, drift))
-            GZ = self.RS['GZ']((V, heel, drift))
+            HA = self.RS['zCE'](np.array([[V, drift]]))[0] - self.RS['zCLR'](np.array([[V, drift]]))[0]
+            GZ = self.RS['GZ'](np.array([[V, heel, drift]]))[0]
             
-            Fy = self.RS['FyRig']((aws, awa))
-            Ry = self.RS['FyApp']((V, drift))
+            Fy = self.RS['FyRig'](np.array([[aws, awa]]))[0]
+            Ry = self.RS['FyApp'](np.array([[V, drift]]))[0]
             
             D = self.hull.displacement
             
@@ -382,7 +394,7 @@ if __name__=='__main__':
     
     #%% Sailboat definition
     
-    sailboat = Sailboat('soos')
+    sailboat = Sailboat('pakiaka')
     
     #Hull definition
     mesh = "D:/000Documents/Cours/DPEA/paki_aka/carenes/18ft_25.stl"
@@ -399,6 +411,7 @@ if __name__=='__main__':
     
     sailboat.add_rig()
     sailboat.rig.add_mainsail('main', nSections, mainLe, mainChords)
+    rig.add_jib('jib', nSections, jibLe, jibChords)
     
     # Appendages definition
     profile = 'eppler836.dat'
