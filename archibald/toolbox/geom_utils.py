@@ -25,6 +25,8 @@ _VALID_DXF_TYPES = [
     "POLYLINE",
     "SPLINE" ,
     "LINE",
+    "LWPOLYLINE",
+    "ARC",
 ]
 
 def build_spline(control_points, degree, n=200):
@@ -134,27 +136,35 @@ def read_dxf(filename, nSections, method='bezier'):
         if entity.dxftype() in _VALID_DXF_TYPES:
             splines.append(entity)
     
-    if len(splines)==2:
+    if len(splines) == 2:
         
-        if splines[0].dxftype() == 'SPLINE':
-            leControl = np.array(splines[0].control_points[:])
-            leDeg = splines[0].dxf.degree
-        else:
-            start = [splines[0].dxf.start.x, splines[0].dxf.start.y, splines[0].dxf.start.z]
-            end = [splines[0].dxf.end.x, splines[0].dxf.end.y, splines[0].dxf.end.z]
-            leControl = np.linspace(start, end, 3)
-            leDeg = 2
-            
-        if splines[1].dxftype() == 'SPLINE':
-            teControl = np.array(splines[1].control_points[:])
-            teDeg = splines[1].dxf.degree
-        else:
-            start = [splines[0].dxf.start.x, splines[0].dxf.start.y, splines[0].dxf.start.z]
-            end = [splines[0].dxf.end.x, splines[0].dxf.end.y, splines[0].dxf.end.z]
-            teControl = np.linspace(start, end, 3)
-            teDeg = 2
+        def get_entity_data(entity):
+            dtype = entity.dxftype()
+            if dtype == 'SPLINE':
+                control = np.array(entity.control_points[:])
+                deg = entity.dxf.degree
+            elif dtype == 'POLYLINE':
+                control = np.array(list(entity.points()))
+                deg = 1
+            elif dtype == 'LWPOLYLINE':
+                control = np.array(list(entity.vertices_in_wcs()))
+                deg = 1
+            elif dtype == 'ARC':
+                # Convert the arc to a spline to preserve exact curvature data
+                spline_ent = entity.to_spline(replace=False)
+                control = np.array(spline_ent.control_points[:])
+                deg = spline_ent.dxf.degree
+            else:  # LINE or other entities with start/end attributes
+                start = [entity.dxf.start.x, entity.dxf.start.y, entity.dxf.start.z]
+                end = [entity.dxf.end.x, entity.dxf.end.y, entity.dxf.end.z]
+                control = np.linspace(start, end, 3)
+                deg = 2
+            return control, deg
+
+        leControl, leDeg = get_entity_data(splines[0])
+        teControl, teDeg = get_entity_data(splines[1])
         
-        if np.max(leControl[:,0]) <= np.max(teControl[:,0]): # if le is behind te
+        if np.max(leControl[:, 0]) <= np.max(teControl[:, 0]): # if le is behind te
             # swap the edges
             tmpControl = leControl
             leControl = teControl
@@ -162,10 +172,6 @@ def read_dxf(filename, nSections, method='bezier'):
             tmpDeg = leDeg
             leDeg = teDeg
             teDeg = tmpDeg
-        
-        # sort the control points from root to tip
-        # leControl = leControl[leControl[:, 1].argsort()]
-        # teControl = teControl[teControl[:, 1].argsort()]
         
         return leControl, leDeg, teControl, teDeg
     
