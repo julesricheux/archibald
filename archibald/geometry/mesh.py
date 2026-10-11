@@ -814,6 +814,50 @@ class ArchibaldMesh(ArchibaldObject):
         
         return frontal_area
         
+    def frontal_area_centroid(
+        self,
+        direction: Union[str, np.ndarray],
+        weight: Union[float, np.ndarray]=1.
+    ):
+        """
+        Compute the centroid of the frontal area of a mesh in a given direction.
+        
+        Each face is located at its center and weighted by its contribution to the
+        frontal area (same weights as in ``frontal_area``), so the result is the
+        approximate centre of effort of the projected area.
+
+        Parameters:
+        - direction: str or (3,) array representing the frontal direction (str, numpy array or CasADi MX/SX).
+        - weight: float or (n_faces,) array of face weights.
+
+        Returns:
+        - frontal_area_centroid: (1, 3) array.
+        
+        """
+        if type(direction) is str:
+            direction = axis_string_to_array(direction)
+        
+        if self._data['cross_product'] is None:
+            self.compute_cross_product()
+            
+        if self._data['triangle_centers'] is None:
+            self.compute_triangle_centers()
+            
+        cross_prod = self._data['cross_product']
+        
+        # Normalize the direction vector
+        direction = direction / np.linalg.norm(direction)
+        
+        cos_theta_area = (cross_prod @ tall(direction))
+        proj_areas = np.fabs(cos_theta_area) * tall(weight) / 4.0
+        
+        return wide(
+            np.sum(
+                self._data['triangle_centers'] * proj_areas / (np.sum(proj_areas) + 1e-12),
+                axis=0
+            )
+        )
+        
     def weighted_volume(
         self,
         weight: Union[np.ndarray, float] = 1.,
@@ -999,39 +1043,28 @@ class ArchibaldMesh(ArchibaldObject):
         )
     
     
-    def hydrostatics(
+    def _face_weights(
             self,
-            point: Union[np.ndarray, List] = np.zeros(3),
-            normal: Union[np.ndarray, List, str] = "z",
+            point: Union[np.ndarray, List],
+            normal: Union[np.ndarray, List],
         ):
         """
-        Compute hydrostatic quantities for the mesh at the given waterplane.
+        Smooth wet weights of the faces with respect to a waterplane.
 
         Parameters
         ----------
-        point            : (1, 3) or (3,) reference point on the waterplane
-        normal           : (1, 3), (3,) or str — waterplane outward normal
+        point  : (1, 3) reference point on the waterplane
+        normal : (1, 3) waterplane outward normal
 
         Returns
         -------
-        dict with hydrostatics properties as its keys
-            
+        weights : (n_faces,) ~ 1 for wet faces, ~ 0 for dry faces
+        vdist   : (n_vertices, 1) vertices signed distances, > 0 for wet, < 0 for dry
+        fdist   : (n_faces, 3) vertices signed distances, shape similar to self.faces
+
+        Shared by ``hydrostatics`` (weights) and ``aerostatics`` (1 - weights).
+
         """
-        
-        if type(normal) is str:
-            normal = axis_string_to_array(normal)
-        
-        if self._data['cross_product'] is None:
-            self.compute_cross_product()
-            
-        if self._data['tetrahedron_centers'] is None:
-            self.compute_tetrahedron_centers()
-            
-        point = wide(np.array(point))
-        normal = wide(np.array(normal))
-            
-        ux, uy, _ = complete_base_from_waterplane_normal(normal)
-        
         # vertices signed distances from the waterplane, shape similar to self.faces
         # > 0 for wet, < 0 for dry
         vdist = -self.vertices_distances_to_plane(
@@ -1071,6 +1104,43 @@ class ArchibaldMesh(ArchibaldObject):
             wet,
             mix_weights
         ) * (1-dry) 
+        
+        return weights, vdist, fdist
+    
+    def hydrostatics(
+            self,
+            point: Union[np.ndarray, List] = np.zeros(3),
+            normal: Union[np.ndarray, List, str] = "z",
+        ):
+        """
+        Compute hydrostatic quantities for the mesh at the given waterplane.
+
+        Parameters
+        ----------
+        point            : (1, 3) or (3,) reference point on the waterplane
+        normal           : (1, 3), (3,) or str — waterplane outward normal
+
+        Returns
+        -------
+        dict with hydrostatics properties as its keys
+            
+        """
+        
+        if type(normal) is str:
+            normal = axis_string_to_array(normal)
+        
+        if self._data['cross_product'] is None:
+            self.compute_cross_product()
+            
+        if self._data['tetrahedron_centers'] is None:
+            self.compute_tetrahedron_centers()
+            
+        point = wide(np.array(point))
+        normal = wide(np.array(normal))
+            
+        ux, uy, _ = complete_base_from_waterplane_normal(normal)
+        
+        weights, vdist, fdist = self._face_weights(point, normal)
         
         # compute tetrahedron volumes with reference point on the waterplane
         self.compute_tetrahedron_volumes(point)
@@ -1286,6 +1356,165 @@ class ArchibaldMesh(ArchibaldObject):
         h["hB"] = T/2.
         
         return h
+    
+    
+    def aerostatics(
+            self,
+            point: Union[np.ndarray, List] = np.zeros(3),
+            normal: Union[np.ndarray, List, str] = "z",
+        ):
+        """
+        Compute aerostatic quantities for the mesh above the given waterplane,
+        i.e. the geometric properties of the emerged part (topsides, deck,
+        superstructures) needed to evaluate its aerodynamic drag.
+        
+        Mirrors ``hydrostatics``: same waterplane definition, same smooth
+        wet/dry weighting (dry weights = 1 - wet weights), and same key names
+        whenever the quantity is the aerial counterpart of a hydrostatic one.
+        
+        Projected areas and their centroids are given along the waterplane axes
+        (ux : forward, uy : transverse), so heel and trim of the operating point
+        are already accounted for.
+
+        Parameters
+        ----------
+        point            : (1, 3) or (3,) reference point on the waterplane
+        normal           : (1, 3), (3,) or str — waterplane outward normal
+
+        Returns
+        -------
+        dict with aerostatics properties as its keys. All centroids are (1, 3)
+        arrays expressed in the mesh frame.
+        
+        Notes
+        -----
+        - ``volume`` and ``cov`` are meaningful only if the mesh is closed above
+          the waterplane (deck included).
+        - Projected areas use the same closed-surface convention as
+          ``frontal_area``. They remain valid for front and side views of a mesh
+          whose deck is left open (dinghy), but not for a top view.
+        - No occlusion is modelled: concave shapes overestimate the projected areas.
+            
+        """
+        
+        if type(normal) is str:
+            normal = axis_string_to_array(normal)
+        
+        if self._data['cross_product'] is None:
+            self.compute_cross_product()
+            
+        if self._data['tetrahedron_centers'] is None:
+            self.compute_tetrahedron_centers()
+            
+        point = wide(np.array(point))
+        normal = wide(np.array(normal))
+            
+        ux, uy, _ = complete_base_from_waterplane_normal(normal)
+        
+        weights, vdist, fdist = self._face_weights(point, normal)
+        
+        # weight = 1 for fully dry faces, 0 for fully wet faces
+        dry_weights = 1. - weights
+        
+        ### Emerged volume and centroid
+        self.compute_tetrahedron_volumes(point)
+        
+        volume = self.weighted_volume(
+            weight=dry_weights,
+            ref_point=point,
+            recompute_tetrahedron_volumes=False,
+        )
+        
+        cov = wide(
+            self.weighted_volume_centroid(
+                weight=dry_weights,
+                ref_point=point,
+                recompute_tetrahedron_volumes=False,
+            )
+        )
+        
+        ### Dry surface area and centroid
+        Ads = self.weighted_area(
+            weight=dry_weights
+        )
+        cod = wide(
+            self.weighted_area_centroid(
+                weight=dry_weights
+            )
+        )
+        
+        ### Frontal and lateral projected areas, and their centroids
+        Ax = self.frontal_area(
+            direction=ux,
+            weight=dry_weights,
+        )
+        Ay = self.frontal_area(
+            direction=uy,
+            weight=dry_weights,
+        )
+        cex = self.frontal_area_centroid(
+            direction=ux,
+            weight=dry_weights,
+        )
+        cey = self.frontal_area_centroid(
+            direction=uy,
+            weight=dry_weights,
+        )
+        
+        ### Air draft (highest point above the waterplane)
+        H = np.softplus(
+            -np.min(fdist),
+            beta=1e3,
+        )
+        
+        ### Overall extents of the emerged part
+        # vertices up to half an edge below the waterplane are kept, to include the sheer line
+        emerged_vertices_weight = np.sigmoid(
+            (-vdist + self.average_length/2.) * 1e3
+        )
+        
+        x_vdist = self.vertices_distances_to_plane(
+            point=point,
+            normal=ux,
+        )
+        y_vdist = self.vertices_distances_to_plane(
+            point=point,
+            normal=uy,
+        )
+        
+        u_all = x_vdist * emerged_vertices_weight
+        v_all = y_vdist * emerged_vertices_weight
+        
+        Loa = np.max(u_all) - np.min(u_all)
+        Boa = np.max(v_all) - np.min(v_all)
+        
+        ### Equivalent mean freeboard, such as Ay = Fb * Loa
+        Fb = Ay / (Loa + 1e-12)
+        
+        ### Dimensionless coefficients
+        Cx = Ax / (Boa * H + 1e-12)   # frontal fullness coefficient
+        Cy = Ay / (Loa * H + 1e-12)   # lateral fullness coefficient
+        
+        a = {}
+        a["volume"] = volume
+        a["cov"] = cov
+        a["Ads"] = Ads
+        a["cod"] = cod
+        
+        a["H"] = H
+        a["Fb"] = Fb
+        a["Loa"] = Loa
+        a["Boa"] = Boa
+        
+        a["Ax"] = Ax
+        a["Ay"] = Ay
+        a["cex"] = cex
+        a["cey"] = cey
+        
+        a["Cx"] = Cx
+        a["Cy"] = Cy
+        
+        return a
     
     
     def slice_mesh(

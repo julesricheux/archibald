@@ -12,6 +12,10 @@ import archibald.dynamics.hydro.dsyhs as dsyhs
 import archibald.dynamics.hydro.holtrop as holtrop
 import archibald.dynamics.hydro.michell as michell
 
+import archibald.dynamics.aero.orc as orc
+import archibald.dynamics.aero.day as day
+import archibald.dynamics.aero.blendermann as blendermann
+
 from typing import Union, List
 from archibald.common import ArchibaldObject
 from archibald.environment import Environment
@@ -42,12 +46,40 @@ DEFAULT_RESISTANCE_METHODS = {
 }
 
 
+# Windage methods. Each of them returns (Fx, Fy, zce) or (Fx, Fy, zce, dxce),
+# see archibald.dynamics.aero.common. The element named "Crew" is not related to
+# the hull: ``Sailboat.compute_windage`` evaluates it once for the whole boat.
+DEFAULT_WINDAGE_METHODS = {
+    "orc": {
+        "Hull": orc.compute_Fhull_orc,
+        "Crew": orc.compute_Fcrew_orc,
+    },
+    # Dinghies: Day (2017), anthropometric crew drag.
+    "day": {
+        "Hull": day.compute_Fhull_day,
+        "Crew": day.compute_Fcrew_day,
+    },
+    # Ships and large powerboats: Blendermann wind load functions (needs a ship_type or its parameters).
+    "blendermann": {
+        "Hull": blendermann.compute_Fhull_blendermann,
+    },
+}
+
+
 def tall(array):
     return np.reshape(array, (-1, 1))
 
 
 def wide(array):
     return np.reshape(array, (1, -1))
+
+
+def get_air_density(op_point, default=1.225):
+    """
+    Air density [kg/m^3] of the operating point environment, if defined, else default.
+    """
+    air = getattr(op_point.environment, 'air', None)
+    return getattr(air, 'density', default)
 
 
 class Hull(ArchibaldObject):
@@ -65,7 +97,9 @@ class Hull(ArchibaldObject):
         self.mesh = mesh
         
         self.hydrostatics_data = {}
+        self.aerostatics_data = {}
         self.resistance_components = {}
+        self.windage_components = {}
         
     def __repr__(self):
         return f"Hull object '{self.name}'"
@@ -82,10 +116,13 @@ class Hull(ArchibaldObject):
             # Pass all kwargs (like draw_plane, opacity, etc.) directly to the mesh
             return self.mesh.draw(backend=backend, **kwargs)
             
-    def compute_hydrostatics_properties(
+    def get_waterplane(
             self,
             op_point: OperatingPoint,
         ):
+        """
+        Point and normal of the water plane, expressed in the hull local frame.
+        """
         
         xh = np.mean(self.mesh.vertices[:, 0])
         yh = np.mean(self.mesh.vertices[:, 1])
@@ -107,7 +144,28 @@ class Hull(ArchibaldObject):
     
         # volume, cob = _temp.hydrostatics()
         
+        return point, normal
+    
+    def compute_hydrostatics_properties(
+            self,
+            op_point: OperatingPoint,
+        ):
+        
+        point, normal = self.get_waterplane(op_point)
+        
         self.hydrostatics_data = self.mesh.hydrostatics(point, normal)
+        
+    def compute_aerostatics_properties(
+            self,
+            op_point: OperatingPoint,
+        ):
+        """
+        Geometric properties of the hull above the water plane, see ``ArchibaldMesh.aerostatics``.
+        """
+        
+        point, normal = self.get_waterplane(op_point)
+        
+        self.aerostatics_data = self.mesh.aerostatics(point, normal)
         
     def get_position(
             self,
@@ -231,6 +289,164 @@ class Hull(ArchibaldObject):
         return Fh, Mh
         
         
+    def compute_windage_components(
+            self,
+            op_point: OperatingPoint,
+            tws: float,
+            twa: float,
+            method: Union[str, dict] = "orc",
+            recompute_statics: bool = True,
+            rho_air: float = None,
+            **kwargs,
+        ):
+        """
+        Aerodynamic force of the wind on the above-water part of the hull and on the crew.
+        
+        Parameters
+        ----------
+        op_point : OperatingPoint, boat attitude and speed through water.
+        tws : float, True wind speed [kt], at the reference height of the wind profile.
+        twa : float, True wind angle [deg], positive when the wind comes from starboard.
+        method : str or dict, key of ``DEFAULT_WINDAGE_METHODS`` or custom dict of methods.
+        recompute_statics : bool, whether to recompute the aerostatics of the hull.
+        rho_air : float or None, air density [kg/m^3]. Default from the environment, else 1.225.
+        **kwargs : parameters of the windage methods (crew_mass, n_crew, Cd_hull, ...).
+        
+        Returns
+        -------
+        dict, for each element of the method: ``Fx`` and ``Fy`` [N] along the boat
+        x (forward) and y (port) axes, ``zce`` [m], height of its centre of effort
+        above the waterplane, and ``dxce`` [m], longitudinal offset of its application
+        point from the lateral centre of effort of the hull. ``_total`` gives the sum
+        of ``Fx`` and ``Fy``.
+        """
+        
+        if recompute_statics:
+            self.compute_aerostatics_properties(op_point)
+            
+        g = op_point.environment.gravity
+        
+        if rho_air is None:
+            rho_air = get_air_density(op_point)
+            
+        env_params = {
+            'g': g,                 # m/s^2
+            'rho_air': rho_air,     # kg/m^3
+        }
+        
+        state_params = {
+            'stw': op_point.stw,
+            'tws': tws,
+            'twa': twa,
+            'heel': getattr(op_point, 'heel', 0.),
+        }
+        
+        # Hydrostatic properties used by some windage methods
+        hydro_params = {
+            key: self.hydrostatics_data[key]
+            for key in ("Cwp",)
+            if key in self.hydrostatics_data
+        }
+        
+        # Centroids are brought in the water axes, as done for the buoyancy: 
+        # their z coordinate is then the height above the water plane.
+        aero_data = dict(self.aerostatics_data)
+        for key in ("cov", "cod", "cex", "cey"):
+            aero_data[key] = op_point.apply_transformations(self.aerostatics_data[key])
+        
+        if type(method)==str and method in DEFAULT_WINDAGE_METHODS.keys():
+            process = DEFAULT_WINDAGE_METHODS[method]
+        elif type(method)==dict:
+            process = method
+        elif type(method)==str:
+            raise NotImplementedError(
+                f"Unknown method '{method}'. Should be in {list(DEFAULT_WINDAGE_METHODS.keys())} or a custom dictionary of methods.")
+        else:
+            raise TypeError("method argument should be str or dict")
+            
+        r = {}
+        Fx_tot = 0.
+        Fy_tot = 0.
+        for name, func in process.items():
+            out = func(**aero_data, **hydro_params, **env_params, **state_params, **kwargs)
+            Fx, Fy, zce = out[:3]
+            # optional longitudinal offset of the application point from the lateral centroid [m]
+            dxce = out[3] if len(out) > 3 else 0.
+            r[name] = {"Fx": Fx, "Fy": Fy, "zce": zce, "dxce": dxce}
+            Fx_tot = Fx_tot + Fx
+            Fy_tot = Fy_tot + Fy
+        
+        r["_total"] = {"Fx": Fx_tot, "Fy": Fy_tot}
+        
+        return r
+    
+    
+    def compute_windage(
+            self,
+            op_point: OperatingPoint,
+            tws: float,
+            twa: float,
+            method: Union[str, dict] = "orc",
+            recompute_statics: bool = True,
+            position: Union[np.ndarray, List] = None,
+            **kwargs,
+        ):
+        """
+        Aerodynamic force and moment of the wind on the above-water part of the hull
+        and on the crew, in the water axes. See ``compute_windage_components``.
+        
+        Every element is applied at its own height, and at the horizontal position
+        of the lateral centre of effort of the hull (plus the offset ``dxce`` of the
+        method, if any), unless ``position`` is given.
+        
+        Parameters
+        ----------
+        position : (1, 3) or (3,) array or None, point in the hull local frame whose
+            horizontal position (x, y) is used instead of the lateral centre of effort,
+            e.g. the position of the crew.
+        
+        Returns
+        -------
+        Fa, Ma : (1, 3) arrays, force [N] and moment [N.m] about the origin.
+        """
+        
+        self.windage_components = self.compute_windage_components(
+            op_point=op_point,
+            tws=tws,
+            twa=twa,
+            method=method,
+            recompute_statics=recompute_statics,
+            **kwargs
+        )
+        
+        if position is None:
+            cey = op_point.apply_transformations(self.aerostatics_data['cey'])
+        else:
+            cey = op_point.apply_transformations(wide(np.array(position)))
+        
+        Fa = wide(np.zeros(3))
+        Ma = wide(np.zeros(3))
+        
+        for name, c in self.windage_components.items():
+            if name == "_total":
+                continue
+            
+            F = (
+                wide(np.array([1., 0., 0.])) * c["Fx"]
+                + wide(np.array([0., 1., 0.])) * c["Fy"]
+            )
+            center = (
+                cey * wide(np.array([1., 1., 0.]))
+                + wide(np.array([1., 0., 0.])) * c["dxce"]
+                + wide(np.array([0., 0., 1.])) * c["zce"]
+            )
+            
+            Fa = Fa + F
+            Ma = Ma + np.cross(center, F)
+        
+        return Fa, Ma
+        
+        
 if __name__=="__main__":
     import os
     from archibald.optimization import Opti
@@ -298,3 +514,12 @@ if __name__=="__main__":
     print(hull.resistance_components)
     
     print(hull.get_position(op_point))
+    
+    hull.compute_aerostatics_properties(op_point)
+    print(hull.aerostatics_data)
+    
+    print(hull.compute_windage(op_point, tws=12., twa=45., method="orc", n_crew=1.))
+    print(hull.windage_components)
+    
+    print(hull.compute_windage(op_point, tws=12., twa=45., method="day", crew_mass=80., crew_height=1.83))
+    print(hull.windage_components)

@@ -14,7 +14,7 @@ import copy
 
 from typing import List, Dict, Union, Optional, Tuple
 
-from archibald.geometry.hull import Hull
+from archibald.geometry.hull import Hull, DEFAULT_WINDAGE_METHODS
 from archibald.geometry.planform import Rig, Appendage, Planform
 from archibald.geometry.propeller import Propeller, BSeriesPropeller
 from archibald.geometry.mesh import ArchibaldMesh
@@ -66,6 +66,7 @@ class Sailboat(ArchibaldObject):
         self.forces = {}
         self.moments = {}
         self.hull_interaction = None
+        self.windage_components = {}
         
     def compute_aerodynamics(
             self,
@@ -230,6 +231,111 @@ class Sailboat(ArchibaldObject):
             self.moments["Mh"] += self.moments["Mi"]
             
         
+    def compute_windage(
+            self,
+            op_point: OperatingPoint,
+            tws: float,
+            twa: float,
+            method: Union[str, Dict] = "orc",
+            recompute_statics: bool = True,
+            crew_hull: int = 0,
+            crew_position: Optional[Union[np.ndarray, List]] = None,
+            **kwargs,
+        ):
+        """
+        Aerodynamic drag of the above-water part of the hulls, and of the crew.
+        
+        The hull elements of the method are evaluated for every hull. The element
+        named "Crew" is not related to a hull, so it is evaluated only once for the
+        whole boat, with the aerostatics of the hull ``crew_hull``.
+        
+        The aerostatics of every hull are (re)computed unless ``recompute_statics``
+        is False. The hydrostatics must have been computed beforehand
+        (``compute_buoyancy``) for the methods requiring ``Cwp``.
+        
+        The rig is not included: its aerodynamics is the purpose of ``compute_aerodynamics``.
+        
+        Parameters
+        ----------
+        op_point : OperatingPoint
+        tws : float, True wind speed [kt].
+        twa : float, True wind angle [deg], positive when the wind comes from starboard.
+        method : str or dict, key of ``hull.DEFAULT_WINDAGE_METHODS`` or custom dict of methods.
+        recompute_statics : bool, whether to recompute the aerostatics of the hulls.
+        crew_hull : int, index of the hull whose geometry (freeboard, beam) gives the
+            default height of the crew. Use ``zce_crew`` to set it directly.
+        crew_position : (1, 3) or (3,) array or None, position of the crew in the boat
+            frame. Default is the horizontal position of the lateral centre of effort
+            of ``crew_hull``.
+        **kwargs : parameters of the windage methods (crew_mass, n_crew, ship_type, ...).
+        
+        Returns
+        -------
+        Fa, Ma : (1, 3) arrays, total force [N] and moment [N.m] in the water axes.
+        """
+        if len(self.hulls) == 0:
+            raise ValueError("The boat has no hull.")
+        
+        if type(method) == str and method in DEFAULT_WINDAGE_METHODS.keys():
+            process = DEFAULT_WINDAGE_METHODS[method]
+        elif type(method) == dict:
+            process = method
+        elif type(method) == str:
+            raise NotImplementedError(
+                f"Unknown method '{method}'. Should be in {list(DEFAULT_WINDAGE_METHODS.keys())} or a custom dictionary of methods.")
+        else:
+            raise TypeError("method argument should be str or dict")
+        
+        hull_process = {k: f for k, f in process.items() if k != "Crew"}
+        crew_process = {k: f for k, f in process.items() if k == "Crew"}
+        
+        # clear the results of a previous call, e.g. with a different method
+        for key in [k for k in self.forces if k.startswith("Fwd_")]:
+            del self.forces[key]
+        for key in [k for k in self.moments if k.startswith("Mwd_")]:
+            del self.moments[key]
+        
+        self.forces["Fwd"] = wide(np.zeros(3))
+        self.moments["Mwd"] = wide(np.zeros(3))
+        self.windage_components = {}
+        
+        for i, hull in enumerate(self.hulls):
+            Fa_i, Ma_i = hull.compute_windage(
+                op_point=op_point,
+                tws=tws,
+                twa=twa,
+                method=hull_process,
+                recompute_statics=recompute_statics,
+                **kwargs,
+            )
+            self.forces[f"Fwd_{i}"] = Fa_i
+            self.moments[f"Mwd_{i}"] = Ma_i
+            self.windage_components[f"hull_{i}"] = hull.windage_components
+            
+            self.forces["Fwd"] = self.forces["Fwd"] + Fa_i
+            self.moments["Mwd"] = self.moments["Mwd"] + Ma_i
+            
+        if len(crew_process) > 0:
+            # aerostatics of the hulls have just been computed above
+            Fa_c, Ma_c = self.hulls[crew_hull].compute_windage(
+                op_point=op_point,
+                tws=tws,
+                twa=twa,
+                method=crew_process,
+                recompute_statics=False,
+                position=crew_position,
+                **kwargs,
+            )
+            self.forces["Fwd_crew"] = Fa_c
+            self.moments["Mwd_crew"] = Ma_c
+            self.windage_components["crew"] = self.hulls[crew_hull].windage_components
+            
+            self.forces["Fwd"] = self.forces["Fwd"] + Fa_c
+            self.moments["Mwd"] = self.moments["Mwd"] + Ma_c
+        
+        return self.forces["Fwd"], self.moments["Mwd"]
+        
+        
     def compute_torsor(
             self,
             op_point: OperatingPoint,
@@ -237,8 +343,21 @@ class Sailboat(ArchibaldObject):
             recompute_statics: bool = True,
             interaction: Optional[Union[str, Dict]] = None,
             interaction_kwargs: Optional[Dict] = None,
+            windage: Optional[Union[str, Dict]] = None,
+            windage_kwargs: Optional[Dict] = None,
             **kwargs,
         ):
+        """
+        Total force and moment on the boat.
+        
+        Parameters
+        ----------
+        windage : str, dict or None, windage method of the hulls and crew (see
+            ``compute_windage``). None: no windage.
+        windage_kwargs : dict, parameters of the windage method, including the
+            wind (``tws`` [kt] and ``twa`` [deg]).
+        **kwargs : parameters of the individual resistance method.
+        """
         self.compute_aerodynamics(op_point)
         self.compute_hydrodynamics(op_point)
         self.compute_weight(op_point)
@@ -252,8 +371,19 @@ class Sailboat(ArchibaldObject):
             **kwargs,
         )
         
-        self.forces["Ftot"] = self.forces["Fb"] + self.forces["Fw"] + self.forces["Fh"]
-        self.moments["Mtot"] = self.moments["Mb"] + self.moments["Mw"] + self.moments["Mh"]
+        if windage is not None:
+            self.compute_windage(
+                op_point=op_point,
+                method=windage,
+                recompute_statics=recompute_statics,
+                **(windage_kwargs or {}),
+            )
+        else:
+            self.forces["Fwd"] = wide(np.zeros(3))
+            self.moments["Mwd"] = wide(np.zeros(3))
+        
+        self.forces["Ftot"] = self.forces["Fb"] + self.forces["Fw"] + self.forces["Fh"] + self.forces["Fwd"]
+        self.moments["Mtot"] = self.moments["Mb"] + self.moments["Mw"] + self.moments["Mh"] + self.moments["Mwd"]
         
         return self.forces["Ftot"], self.moments["Mtot"]
     
