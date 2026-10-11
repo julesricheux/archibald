@@ -71,14 +71,53 @@ class Sailboat(ArchibaldObject):
     def compute_aerodynamics(
             self,
             op_point: OperatingPoint = OperatingPoint(),
+            chordwise_resolution=10,
+            spanwise_resolution=1,
+            alpha_stall=20,
         ):
-        pass
+        self.forces["Fsail"] = wide(np.zeros(3))
+        self.moments["Msail"] = wide(np.zeros(3))
+        
+        for i, rig in enumerate(self.rigs):
+            aeroVLM = AeroVortexLatticeMethod(
+                rig,
+                op_point,
+                chordwise_resolution=chordwise_resolution,
+                spanwise_resolution=spanwise_resolution,
+            )
+            
+            res = aeroVLM.run(alpha_stall=alpha_stall)
+            
+            self.forces[f"Fsail_{i}"] = res["F_ab"]
+            self.moments[f"Msail_{i}"] = res["M_ab"]
+            
+            self.forces["Fsail"] += res["F_ab"]
+            self.moments["Msail"] += res["M_ab"]
     
     def compute_hydrodynamics(
             self,
             op_point: OperatingPoint = OperatingPoint(),
+            chordwise_resolution=10,
+            spanwise_resolution=1,
+            alpha_stall=20,
         ):
-        pass
+        self.forces["Fapp"] = wide(np.zeros(3))
+        self.moments["Mapp"] = wide(np.zeros(3))
+        for i, appendage in enumerate(self.appendages):
+            hydroVLM = HydroVortexLatticeMethod(
+                appendage,
+                op_point,
+                chordwise_resolution=chordwise_resolution,
+                spanwise_resolution=spanwise_resolution,
+            )
+            
+            res = hydroVLM.run(alpha_stall=alpha_stall)
+            
+            self.forces[f"Fapp_{i}"] = res["F_ab"]
+            self.moments[f"Mapp_{i}"] = res["M_ab"]
+            
+            self.forces["Fapp"] += res["F_ab"]
+            self.moments["Mapp"] += res["M_ab"]
         
     def compute_weight(
             self,

@@ -50,8 +50,8 @@ for file in dxf_files:
                 WingXSec(
                     xyz_le=xyz,
                     chord=c,
-                    airfoil=ThinAirfoil(xc=0.4, mc=0.12),
-                    twist=-i/10 * 10,
+                    airfoil=ThinAirfoil(xc=0.4, mc=0.1),
+                    twist=-i/10 * 20,
                 )
             for i, (xyz, c) in enumerate(zip(le, chords))]
         )
@@ -108,8 +108,27 @@ nacra = Sailboat(
 # nacra.draw()
 
 op_point = OperatingPoint(
-    stw=15,
-    heel=9.,
+    stw=10,
+    twa=55,
+    tws0=20,
+    heel=-6.,
+    mainsail_trim=-10,
+    jib_trim=-15,
+)
+
+main_le, main_chords = dxf_to_le_chords(r'data/nacra15_data/mainsail.dxf', 10)
+jib_le, jib_chords = dxf_to_le_chords(r'data/nacra15_data/jib.dxf', 7)
+
+rig["mainsail"] = rig["mainsail"].rotate_local(
+    angle_deg=op_point.mainsail_trim,
+    axis=jib_le[-1] - main_le[0],
+    origin=main_le[0],
+)
+
+rig["jib"] = rig["jib"].rotate_local(
+    angle_deg=op_point.jib_trim,
+    axis=jib_le[-1] - jib_le[0],
+    origin=jib_le[0],
 )
 
 # nacra.transform(op_point)
@@ -118,12 +137,12 @@ for hull in hulls:
     # hull.mesh.transform(op_point)
     hull.compute_hydrostatics_properties(op_point)
     
-hull.mesh.draw(
-    draw_plane=True,
-    point=np.array([0, 0, 0]),
-    backend="matplotlib",
-    # backend="plotly",
-)
+# hull.mesh.draw(
+#     draw_plane=True,
+#     point=np.array([0, 0, 0]),
+#     # backend="matplotlib",
+#     # backend="plotly",
+# )
 
 
 # Individual resistance of each hull, then interaction between the two hulls,
@@ -146,6 +165,7 @@ hull.mesh.draw(
 #     print(nacra.hull_interaction['dR_hull'], nacra.hull_interaction['dR'])
 #     # print(nacra.forces["Fh"])
 #     print()
+nacra.draw()
 
 # # Slender hulls: Michell wave resistance for each hull (equivalent hull built
 # # from the hydrostatics) with the Holtrop friction, as a custom process.
@@ -165,6 +185,12 @@ print("Michell")
 print(nacra.forces["Fh"])
 for hull in nacra.hulls:
     print(hull.name, hull.resistance_components)
+    
+nacra.compute_aerodynamics(op_point)
+nacra.compute_hydrodynamics(op_point)
+
+for k, v in nacra.forces.items():
+    print(k, v)
 
 # # No interaction, for comparison
 # nacra.compute_resistance(
