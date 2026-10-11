@@ -415,27 +415,29 @@ class Sailboat(ArchibaldObject):
     
             # --- Rigs ---
             for rig in self.rigs:
-                p, f = rig.mesh_body(method="quad", thin_wings=thin_wings)
-                mesh = pv.PolyData(
-                    *mesh_utils.convert_mesh_to_polydata_format(p, f)
-                )
-                plotter.add_mesh(
-                    mesh,
-                    color=mesh_color,
-                    show_edges=True,
-                )
+                for sail in rig.wings:
+                    p, f = sail.mesh_body(method="quad")
+                    mesh = pv.PolyData(
+                        *mesh_utils.convert_mesh_to_polydata_format(p, f)
+                    )
+                    plotter.add_mesh(
+                        mesh,
+                        color=mesh_color,
+                        show_edges=True,
+                    )
     
             # --- Appendages ---
-            for app in self.appendages:
-                p, f = app.mesh_body(method="quad", thin_wings=thin_wings)
-                mesh = pv.PolyData(
-                    *mesh_utils.convert_mesh_to_polydata_format(p, f)
-                )
-                plotter.add_mesh(
-                    mesh,
-                    color=mesh_color,
-                    show_edges=True,
-                )
+            for appendage in self.appendages:
+                for fin in appendage.wings:
+                    p, f = fin.mesh_body(method="quad")
+                    mesh = pv.PolyData(
+                        *mesh_utils.convert_mesh_to_polydata_format(p, f)
+                    )
+                    plotter.add_mesh(
+                        mesh,
+                        color=mesh_color,
+                        show_edges=True,
+                    )
     
             # --- Hulls ---
             for hull in self.hulls:

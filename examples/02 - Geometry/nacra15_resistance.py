@@ -10,7 +10,7 @@ import os
 import archibald.numpy as np
 
 from archibald.dynamics.hydro import holtrop, michell
-from archibald.geometry import Hull, Sailboat, Rig, Sail, WingXSec, ThinAirfoil, Fin
+from archibald.geometry import Hull, Sailboat, Rig, Sail, WingXSec, ThinAirfoil, Fin, Appendage, Airfoil
 from archibald.performance import OperatingPoint
 
 from archibald.toolbox.geom_utils import dxf_to_le_chords, read_dxf
@@ -84,13 +84,17 @@ for file, af in zip(dxf_files, airfoils):
                 WingXSec(
                     xyz_le=xyz,
                     chord=c,
-                    airfoil=af,
+                    airfoil=Airfoil(af).scale(scale_y=-1.0),
                     twist=0.,
                 )
             for i, (xyz, c) in enumerate(zip(le, chords))]
         )
     )
 
+appendage = Appendage(
+    name="nacra_appendage",
+    fins=apps,
+)
 
 #%% SALBOAT
     
@@ -98,7 +102,7 @@ nacra = Sailboat(
     name="nacra",
     hulls=hulls,
     rigs=[rig],
-    appendages=[apps],
+    appendages=[appendage],
 )
 
 # nacra.draw()
