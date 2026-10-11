@@ -108,8 +108,8 @@ nacra = Sailboat(
 # nacra.draw()
 
 op_point = OperatingPoint(
-    stw=10,
-    heel=5.,
+    stw=15,
+    heel=9.,
 )
 
 # nacra.transform(op_point)
@@ -152,6 +152,7 @@ hull.mesh.draw(
 custom_process = {
     "Rf": holtrop.compute_Rf_holtrop,
     "Rw": michell.compute_Rw_michell,
+    "Rtr": holtrop.compute_Rtr_holtrop,
 }
 
 nacra.compute_resistance(
@@ -162,6 +163,8 @@ nacra.compute_resistance(
 )
 print("Michell")
 print(nacra.forces["Fh"])
+for hull in nacra.hulls:
+    print(hull.name, hull.resistance_components)
 
 # # No interaction, for comparison
 # nacra.compute_resistance(
