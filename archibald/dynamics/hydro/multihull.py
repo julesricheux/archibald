@@ -15,7 +15,7 @@ interference attributed to hull i (half of each pair).
 
 #%% DEPENDENCIES
 
-from archibald.dynamics.hydro import michell, insel_molland
+from archibald.dynamics.hydro import michell, insel_molland, miyazawa, jamaluddin
 
 #%% METHODS
 
@@ -29,6 +29,21 @@ INTERACTION_METHODS = {
     },
     "michell_raw": {
         "Rw": lambda **kw: michell.compute_dRw_michell(**{**kw, "calibrate": False}),
+    },
+    "miyazawa": {
+        "Rf": miyazawa.compute_dRf_miyazawa,
+    },
+    "michell_miyazawa": {
+        "Rw": michell.compute_dRw_michell,
+        "Rf": miyazawa.compute_dRf_miyazawa,
+    },
+    "jamaluddin": {
+        "Rw": jamaluddin.compute_dRw_jamaluddin,
+        "Rf": jamaluddin.compute_dRf_jamaluddin,
+    },
+    "michell_jamaluddin": {
+        "Rw": michell.compute_dRw_michell,
+        "Rf": jamaluddin.compute_dRf_jamaluddin,
     },
     "insel_molland": {
         "Rw": insel_molland.compute_dRw_insel_molland,

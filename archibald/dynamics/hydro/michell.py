@@ -74,6 +74,34 @@ def q_exp(
     return Cx / (1. - Cx + EPS)
 
 
+def r_exp(
+        Cp,
+        **kwargs,
+    ):
+    r"""Longitudinal exponent of the equivalent hull for fine hulls (Cp < 0.5).
+
+    The family :math:`1 - |\xi|^p` of :func:`p_exp` has a cusp at midship when
+    :math:`p < 1`, i.e. :math:`C_P < 0.5` (typically a hull partly lifted out
+    of the water by heel). For these hulls the half-beam is
+
+    .. math::
+        f(\xi) = (1 - |\xi|)^r, \qquad C_P = \frac{1}{r + 1}
+        \quad\Rightarrow\quad r = \frac{1}{C_P} - 1
+
+    which is continuous with the first family at :math:`C_P = 0.5`
+    (:math:`p = r = 1`, a diamond waterline).
+
+    Parameters
+    ----------
+    Cp : float, Prismatic coefficient [-].
+
+    Returns
+    -------
+    float, Exponent r [-].
+    """
+    return 1. / (Cp + EPS) - 1.
+
+
 def u_nodes_michell(
         stw,
         T,
@@ -131,7 +159,8 @@ def kochin_amplitude(
         P + iQ = \iint \frac{\partial y}{\partial x}\,
             e^{k_0 \sec^2\theta\, z + i k_0 \sec\theta\, x}\,dx\,dz
 
-    For the equivalent hull of :func:`p_exp` and :func:`q_exp`, integrating by
+    For the equivalent hull of :func:`p_exp` (:func:`r_exp` if Cp < 0.5) and
+    :func:`q_exp`, integrating by
     parts in x (pointed ends) leaves a purely imaginary factor common to all
     hulls, so that only the real amplitude is kept:
 
@@ -139,7 +168,7 @@ def kochin_amplitude(
         A = \frac{B_{WL}}{2}\,\omega\,T\,C(\omega)\,G(a)
 
     .. math::
-        C = 2\int_0^1 (1-\xi^p)\cos(\omega\xi)\,d\xi, \qquad
+        C = 2\int_0^1 f(\xi)\cos(\omega\xi)\,d\xi, \qquad
         G = \int_0^1 (1-s^q)\,e^{-a T s}\,ds
 
     with :math:`k = k_0\sqrt{1+u^2}`, :math:`\omega = k L_{WL}/2` and
@@ -159,7 +188,7 @@ def kochin_amplitude(
     array, Kochin amplitude A(u) [m²].
     """
     _k0 = k_0(stw=stw, g=g)
-    p, q = p_exp(Cp), q_exp(Cx)
+    p, q, r = p_exp(Cp), q_exp(Cx), r_exp(Cp)
     k = _k0 * np.sqrt(1. + u_nodes ** 2)
     a = _k0 * (1. + u_nodes ** 2)
     omega = k * Lwl / 2.
@@ -167,13 +196,14 @@ def kochin_amplitude(
     xi, wx = nodes_unit(n_x), simpson_weights(n_x)
     C = 0.
     for i in range(len(xi)):
-        C = C + wx[i] * (1. - xi[i] ** p) * np.cos(omega * xi[i])
+        shape = np.where(Cp >= 0.5, 1. - (xi[i] + 1e-12) ** p, (1. - xi[i] + 1e-9) ** r)
+        C = C + wx[i] * shape * np.cos(omega * xi[i])
     C = 2. * C
 
     s, wz = nodes_unit(n_z), simpson_weights(n_z)
     G = 0.
     for i in range(len(s)):
-        G = G + wz[i] * (1. - s[i] ** q) * np.exp(-a * T * s[i])
+        G = G + wz[i] * (1. - (s[i] + 1e-12) ** q) * np.exp(-a * T * s[i])
 
     return (Bwl / 2.) * omega * T * C * G
 

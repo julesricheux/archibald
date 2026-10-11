@@ -147,3 +147,34 @@ def interp_table(
         out = out + col * hat
     tail = np.where(SL > sl[-1], np.minimum((SL - sl[-1]) / sl[-1], 1.), 0.)
     return out * (1. - tail) + outside * tail
+
+def interp_nodes(
+        x,
+        grid,
+        values,
+        **kwargs,
+    ):
+    r"""Differentiable piecewise linear interpolation with symbolic node values.
+
+    Same as ``np.interp`` but ``values`` may depend on differentiable
+    quantities (``np.interp`` needs numeric node values). Outside the grid the
+    first / last value is held.
+
+    Parameters
+    ----------
+    x : float, Abscissa [-].
+    grid : list of float, Increasing numeric abscissae of the nodes [-].
+    values : list of float, Node values (may be symbolic).
+
+    Returns
+    -------
+    float, Interpolated value.
+    """
+    n = len(grid)
+    out = 0.
+    for j in range(n):
+        wl = 1. if j == 0 else np.maximum((x - grid[j - 1]) / (grid[j] - grid[j - 1]), 0.)
+        wr = 1. if j == n - 1 else np.maximum((grid[j + 1] - x) / (grid[j + 1] - grid[j]), 0.)
+        out = out + values[j] * np.where(x < grid[j], wl, wr)
+    return out
+
