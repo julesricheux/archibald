@@ -21,6 +21,12 @@ import scipy.interpolate as itrp
 
 #%% FUNCTIONS
 
+_VALID_DXF_TYPES = [
+    "POLYLINE",
+    "SPLINE" ,
+    "LINE",
+]
+
 def build_spline(control_points, degree, n=200):
 
     control_points = np.array(control_points)
@@ -125,7 +131,7 @@ def read_dxf(filename, nSections, method='bezier'):
     splines = []
     
     for entity in msp:
-        if entity.dxftype() == 'SPLINE' or entity.dxftype() == 'LINE':
+        if entity.dxftype() in _VALID_DXF_TYPES:
             splines.append(entity)
     
     if len(splines)==2:

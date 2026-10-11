@@ -12,7 +12,7 @@ Régression sur 118 carènes (7 séries) :  R/W = f(Fn_vol, L/∇^(1/3), W/(ρ g
    est levé (le registre n'expose alors pas cette méthode par défaut).
 """
 import archibald.numpy as np
-from .planing_common import speed_ms, Fn_vol
+from planing_common import speed_ms, Fn_vol
 
 MERCIER_SAVITSKY_COEFFS = None     # à renseigner depuis le rapport original
 AVAILABLE = False

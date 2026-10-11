@@ -10,8 +10,12 @@ import os
 import archibald.numpy as np
 
 from archibald.dynamics.hydro import holtrop, michell
-from archibald.geometry import Hull, Sailboat
+from archibald.geometry import Hull, Sailboat, Rig, Sail, WingXSec, ThinAirfoil
 from archibald.performance import OperatingPoint
+
+from archibald.toolbox.geom_utils import dxf_to_le_chords
+
+#%% HULLS
 
 hulls = []
 
@@ -27,6 +31,48 @@ for file in stl_files:
             mesh=file,
         )
     )
+    
+#%% RIG
+
+dxf_files = [
+    r'data/nacra15_data/mainsail.dxf',
+    r'data/nacra15_data/jib.dxf',
+]
+
+sails = []
+for file in dxf_files:
+    le, chords = dxf_to_le_chords(file, 10)
+    
+    sails.append(
+        Sail(
+            name=os.path.basename(file[:-4]),
+            xsecs=[
+                WingXSec(
+                    xyz_le=xyz,
+                    chord=c,
+                    airfoil=ThinAirfoil(xc=0.45, mc=0.12),
+                    twist=-i/10 * 10,
+                )
+            for i, (xyz, c) in enumerate(zip(le, chords))]
+        )
+    )
+
+
+rig = Rig(
+    name="nacra_rig",
+    wings=sails,
+)
+
+#%% APPENDAGE
+
+dxf_files = [
+    r'data/nacra15_data/fin_prt.dxf',
+    r'data/nacra15_data/rudder_sbd.dxf',
+    r'data/nacra15_data/rudder_prt.dxf',
+]
+
+
+#%% SALBOAT
     
 nacra = Sailboat(
     name="nacra",

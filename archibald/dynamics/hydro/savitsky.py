@@ -23,7 +23,7 @@ Resistance components (to be summed), each from its own independent function :
     Rf  = Df / cos(tau)          frictional   (depends on the wetted geometry and Vm only)
     Rw  = L_dyn tan(tau)         pressure     (depends on the dynamic lift only)
     Rsp                          whisker spray (viscous, 2007 extension)
-    Raw                          added resistance in waves (Savitsky & Brown 1976), 0 if no H_sig
+    Raw                          added resistance in waves (Savitsky & Brown 1976), 0 if no swh
     Rtr = 0                      dry transom
 Rf + Rw is Savitsky's  D = Delta tan(tau) + Df / cos(tau)  (the vertical friction component
 Df sin(tau) is carried by the pressure force, which is why Rf has the 1/cos(tau)).
@@ -693,26 +693,26 @@ def Raw_parameters(
         trim,
         Bwl,
         deadrise,
-        H_sig,
+        swh,
         Loa,
-        weight,
+        displacement,
         **kwargs,
     ):
     r"""Non dimensional parameters of the added resistance regression (imperial units).
 
     Applicability range of the regression (Savitsky & Brown 1976, p. 395) :
     100 <= P1 = Delta_LT / (0.01 L)^3 <= 250 ; 3 <= P2 = L/b <= 5 ; 3 <= trim <= 7 deg ;
-    10 <= beta <= 30 deg ; 0.2 <= P5 = H_sig/b <= 0.7 ; 2 <= P6 = Vk/sqrt(L) <= 6.
+    10 <= beta <= 30 deg ; 0.2 <= P5 = swh/b <= 0.7 ; 2 <= P6 = Vk/sqrt(L) <= 6.
 
     Returns
     -------
     dict, C_Delta, P1, P2, P5, P6, and the imperial quantities Delta, L, b, H, w.
     """
-    Delta_LT = weight / _LT
+    Delta_LT = displacement / _LT
     Delta = Delta_LT * 2240.
     L = Loa * _FT
     b = Bwl * _FT
-    H = H_sig * _FT
+    H = swh * _FT
     w = rho * g / (_LBF * _FT ** 3)
     return dict(
         C_Delta=Delta / (w * b ** 3), P1=Delta_LT / (0.01 * L) ** 3, P2=L / b, P5=H / b,
@@ -727,9 +727,9 @@ def R_AW_interp(
         trim,
         Bwl,
         deadrise,
-        H_sig,
+        swh,
         Loa,
-        weight,
+        displacement,
         **kwargs,
     ):
     r"""Added resistance in waves : regression at Vk/sqrt(L) = 2, 4, 6 and parabolic interpolation.
@@ -746,7 +746,7 @@ def R_AW_interp(
     float, Added resistance [N].
     """
     P = Raw_parameters(stw=stw, rho=rho, g=g, trim=trim, Bwl=Bwl, deadrise=deadrise,
-                       H_sig=H_sig, Loa=Loa, weight=weight)
+                       swh=swh, Loa=Loa, displacement=displacement)
     wb3 = P["w"] * P["b"] ** 3
     Hb, Lb, Cd = P["H"] / P["b"], P["L"] / P["b"], P["C_Delta"]
 
@@ -919,10 +919,10 @@ def compute_Raw_savitsky(
         trim,
         Bwl,
         deadrise,
-        H_sig=None,
+        swh=None,
         Loa=None,
         Lbp=None,
-        weight=None,
+        displacement=None,
         mass=None,
         volume=None,
         **kwargs,
@@ -930,12 +930,12 @@ def compute_Raw_savitsky(
     r"""
     Calculate the added resistance in waves using Savitsky & Brown (1976).
 
-    Zero in calm water (H_sig is None or 0). The regression is expressed in terms of the vessel
-    weight (use the real weight, constant in the NLP : `weight` or `mass`) ; if neither is given
+    Zero in calm water (swh is None or 0). The regression is expressed in terms of the vessel
+    displacement (use the real displacement, constant in the NLP : `displacement` or `mass`) ; if neither is given
     rho g volume is used, which then follows the immersed volume (not recommended).
 
     !! The regression was fitted on heavy, large planing craft : 100 <= Delta_LT/(0.01 L)^3 <= 250,
-       3 <= L/b <= 5, 3 <= trim <= 7 deg, 10 <= beta <= 30 deg, 0.2 <= H_sig/b <= 0.7,
+       3 <= L/b <= 5, 3 <= trim <= 7 deg, 10 <= beta <= 30 deg, 0.2 <= swh/b <= 0.7,
        2 <= Vk/sqrt(L[ft]) <= 6. A dinghy is usually OUTSIDE this range (extrapolation) :
        see Raw_parameters() to check the margins.
 
@@ -947,24 +947,24 @@ def compute_Raw_savitsky(
     trim : float, Trim angle [deg].
     Bwl : float, Beam at the chines [m].
     deadrise : float, Deadrise angle [deg].
-    H_sig : float, Significant wave height [m].
+    swh : float, Significant wave height [m].
     Loa : float, Overall length [m] (default Lbp, else 3 b).
-    weight : float, Vessel weight [N] (or mass [kg]).
+    displacement : float, Vessel displacement [N] (or mass [kg]).
 
     Returns
     -------
     float, Added resistance in waves [N].
     """
-    if H_sig is None or (isinstance(H_sig, (int, float)) and H_sig == 0):
+    if swh is None or (isinstance(swh, (int, float)) and swh == 0):
         return 0. * stw
 
-    if weight is None:
-        weight = mass * g if mass is not None else rho * g * volume
+    if displacement is None:
+        displacement = mass * g if mass is not None else rho * g * volume
     if Loa is None:
         Loa = Lbp if Lbp is not None else 3. * Bwl
 
     Raw = R_AW_interp(stw=stw, rho=rho, g=g, trim=trim, Bwl=Bwl, deadrise=deadrise,
-                      H_sig=H_sig, Loa=Loa, weight=weight)
+                      swh=swh, Loa=Loa, displacement=displacement)
 
     if not np.is_casadi_type(Raw):
         Raw = np.squeeze(Raw)
