@@ -13,7 +13,7 @@ are measured in the waterplane axes, hence the effect of heel and trim is
 already included.
 """
 
-from archibald.dynamics.aero.common import windage_element, crew_zce
+from archibald.dynamics.aero.common import windage_element, resolve_crew_zce
 
 
 def compute_Fhull_orc(
@@ -79,6 +79,7 @@ def compute_Fcrew_orc(
         Cd_crew=1.08,
         A_front=0.25,
         A_side_per_crew=0.5,
+        crew_position=None,
         zce_crew=None,
         z_ref=10.,
         wind_alpha=1./7.,
@@ -101,8 +102,12 @@ def compute_Fcrew_orc(
     Cd_crew : float, Drag coefficient of the crew, 1.08 in the ORC VPP.
     A_front : float, Frontal area of the crew [m^2].
     A_side_per_crew : float, Side area per crew member [m^2].
-    zce_crew : float or None, Height of the centre of effort above the waterplane [m].
-        Default is the ORC value, see ``crew_zce``.
+    crew_position : (1, 3) array or None, Position of the crew in the water axes [m]
+        (given by ``Hull.compute_windage`` from the position in the boat frame).
+        Its z coordinate is the height of the centre of effort.
+    zce_crew : float or None, Explicit height of the centre of effort above the
+        waterplane [m], with priority over ``crew_position``. If neither is
+        given, the ORC value is used, see ``crew_zce``.
     z_ref, wind_alpha : Wind profile, see ``apparent_wind``.
 
     Returns
@@ -110,8 +115,13 @@ def compute_Fcrew_orc(
     Fx, Fy, zce : Force components [N] and height of the centre of effort [m].
     """
     
-    if zce_crew is None:
-        zce_crew = crew_zce(Fb=Fb, Boa=Boa, heel=heel)
+    zce_crew = resolve_crew_zce(
+        crew_position=crew_position,
+        zce_crew=zce_crew,
+        Fb=Fb,
+        Boa=Boa,
+        heel=heel,
+    )
     
     return windage_element(
         CdA_front=Cd_crew * A_front,

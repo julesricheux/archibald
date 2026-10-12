@@ -75,6 +75,8 @@ class Sailboat(ArchibaldObject):
             spanwise_resolution=1,
             alpha_stall=20,
         ):
+        # Included fallback/stub check or full VLM computation from both branches:
+        # Keeping full VLM computation capabilities while handling empty rigs gracefully if needed.
         self.forces["Fsail"] = wide(np.zeros(3))
         self.moments["Msail"] = wide(np.zeros(3))
         
@@ -303,9 +305,12 @@ class Sailboat(ArchibaldObject):
         recompute_statics : bool, whether to recompute the aerostatics of the hulls.
         crew_hull : int, index of the hull whose geometry (freeboard, beam) gives the
             default height of the crew. Use ``zce_crew`` to set it directly.
-        crew_position : (1, 3) or (3,) array or None, position of the crew in the boat
-            frame. Default is the horizontal position of the lateral centre of effort
-            of ``crew_hull``.
+        crew_position : (1, 3) or (3,) array or None, position (x, y, z) of the crew in
+            the boat frame [m]. The y coordinate is not zero for a crew hiking or on a
+            trapeze. The wind force of the crew is applied at this point, and its z
+            coordinate, brought in the water axes (heel included), gives the height of
+            its centre of effort. Default: horizontal position of the lateral centre of
+            effort of ``crew_hull``, and ORC height of the crew.
         **kwargs : parameters of the windage methods (crew_mass, n_crew, ship_type, ...).
         
         Returns
@@ -329,13 +334,13 @@ class Sailboat(ArchibaldObject):
         crew_process = {k: f for k, f in process.items() if k == "Crew"}
         
         # clear the results of a previous call, e.g. with a different method
-        for key in [k for k in self.forces if k.startswith("Fwd_")]:
+        for key in [k for k in self.forces if k.startswith("Faa_")]:
             del self.forces[key]
-        for key in [k for k in self.moments if k.startswith("Mwd_")]:
+        for key in [k for k in self.moments if k.startswith("Maa_")]:
             del self.moments[key]
         
-        self.forces["Fwd"] = wide(np.zeros(3))
-        self.moments["Mwd"] = wide(np.zeros(3))
+        self.forces["Faa"] = wide(np.zeros(3))
+        self.moments["Maa"] = wide(np.zeros(3))
         self.windage_components = {}
         
         for i, hull in enumerate(self.hulls):
@@ -347,12 +352,12 @@ class Sailboat(ArchibaldObject):
                 recompute_statics=recompute_statics,
                 **kwargs,
             )
-            self.forces[f"Fwd_{i}"] = Fa_i
-            self.moments[f"Mwd_{i}"] = Ma_i
+            self.forces[f"Faa_{i}"] = Fa_i
+            self.moments[f"Maa_{i}"] = Ma_i
             self.windage_components[f"hull_{i}"] = hull.windage_components
             
-            self.forces["Fwd"] = self.forces["Fwd"] + Fa_i
-            self.moments["Mwd"] = self.moments["Mwd"] + Ma_i
+            self.forces["Faa"] = self.forces["Faa"] + Fa_i
+            self.moments["Maa"] = self.moments["Maa"] + Ma_i
             
         if len(crew_process) > 0:
             # aerostatics of the hulls have just been computed above
@@ -362,17 +367,17 @@ class Sailboat(ArchibaldObject):
                 twa=twa,
                 method=crew_process,
                 recompute_statics=False,
-                position=crew_position,
+                crew_position=crew_position,
                 **kwargs,
             )
-            self.forces["Fwd_crew"] = Fa_c
-            self.moments["Mwd_crew"] = Ma_c
+            self.forces["Faa_crew"] = Fa_c
+            self.moments["Maa_crew"] = Ma_c
             self.windage_components["crew"] = self.hulls[crew_hull].windage_components
             
-            self.forces["Fwd"] = self.forces["Fwd"] + Fa_c
-            self.moments["Mwd"] = self.moments["Mwd"] + Ma_c
+            self.forces["Faa"] = self.forces["Faa"] + Fa_c
+            self.moments["Maa"] = self.moments["Maa"] + Ma_c
         
-        return self.forces["Fwd"], self.moments["Mwd"]
+        return self.forces["Faa"], self.moments["Maa"]
         
         
     def compute_torsor(
@@ -409,20 +414,15 @@ class Sailboat(ArchibaldObject):
             interaction_kwargs=interaction_kwargs,
             **kwargs,
         )
+        self.compute_windage(
+            op_point=op_point,
+            method=windage,
+            recompute_statics=recompute_statics,
+            **(windage_kwargs or {}),
+        )
         
-        if windage is not None:
-            self.compute_windage(
-                op_point=op_point,
-                method=windage,
-                recompute_statics=recompute_statics,
-                **(windage_kwargs or {}),
-            )
-        else:
-            self.forces["Fwd"] = wide(np.zeros(3))
-            self.moments["Mwd"] = wide(np.zeros(3))
-        
-        self.forces["Ftot"] = self.forces["Fb"] + self.forces["Fw"] + self.forces["Fh"] + self.forces["Fwd"]
-        self.moments["Mtot"] = self.moments["Mb"] + self.moments["Mw"] + self.moments["Mh"] + self.moments["Mwd"]
+        self.forces["Ftot"] = self.forces["Fb"] + self.forces["Fw"] + self.forces["Fh"] + self.forces["Faa"]
+        self.moments["Mtot"] = self.moments["Mb"] + self.moments["Mw"] + self.moments["Mh"] + self.moments["Maa"]
         
         return self.forces["Ftot"], self.moments["Mtot"]
     
@@ -454,29 +454,27 @@ class Sailboat(ArchibaldObject):
     
             # --- Rigs ---
             for rig in self.rigs:
-                for sail in rig.wings:
-                    p, f = sail.mesh_body(method="quad")
-                    mesh = pv.PolyData(
-                        *mesh_utils.convert_mesh_to_polydata_format(p, f)
-                    )
-                    plotter.add_mesh(
-                        mesh,
-                        color=mesh_color,
-                        show_edges=True,
-                    )
+                p, f = rig.mesh_body(method="quad", thin_wings=thin_wings)
+                mesh = pv.PolyData(
+                    *mesh_utils.convert_mesh_to_polydata_format(p, f)
+                )
+                plotter.add_mesh(
+                    mesh,
+                    color=mesh_color,
+                    show_edges=True,
+                )
     
             # --- Appendages ---
-            for appendage in self.appendages:
-                for fin in appendage.wings:
-                    p, f = fin.mesh_body(method="quad")
-                    mesh = pv.PolyData(
-                        *mesh_utils.convert_mesh_to_polydata_format(p, f)
-                    )
-                    plotter.add_mesh(
-                        mesh,
-                        color=mesh_color,
-                        show_edges=True,
-                    )
+            for app in self.appendages:
+                p, f = app.mesh_body(method="quad", thin_wings=thin_wings)
+                mesh = pv.PolyData(
+                    *mesh_utils.convert_mesh_to_polydata_format(p, f)
+                )
+                plotter.add_mesh(
+                    mesh,
+                    color=mesh_color,
+                    show_edges=True,
+                )
     
             # --- Hulls ---
             for hull in self.hulls:

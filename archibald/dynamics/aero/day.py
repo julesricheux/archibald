@@ -14,7 +14,7 @@ from archibald.dynamics.aero.common import (
     resolve_wind_drag,
     windage_element,
     smooth_abs_sind,
-    crew_zce,
+    resolve_crew_zce,
 )
 
 
@@ -164,6 +164,7 @@ def compute_Fcrew_day(
         Cd_side=0.954,
         clothing_factor=0.9,
         shielding_factor=0.8,
+        crew_position=None,
         zce_crew=None,
         z_ref=10.,
         wind_alpha=1./7.,
@@ -191,7 +192,12 @@ def compute_Fcrew_day(
     Cd_front, Cd_side : float, Drag coefficients on frontal and side areas.
     clothing_factor : float, Multiplier on the drag coefficients.
     shielding_factor : float, Multiplier on the drag areas.
-    zce_crew : float or None, Height of the centre of effort above the waterplane [m].
+    crew_position : (1, 3) array or None, Position of the crew in the water axes [m]
+        (given by ``Hull.compute_windage`` from the position in the boat frame).
+        Its z coordinate is the height of the centre of effort.
+    zce_crew : float or None, Explicit height of the centre of effort above the
+        waterplane [m], with priority over ``crew_position``. If neither is
+        given, the ORC value is used, see ``crew_zce``.
     z_ref, wind_alpha : Wind profile, see ``apparent_wind``.
 
     Returns
@@ -207,8 +213,13 @@ def compute_Fcrew_day(
     
     k = n_crew * clothing_factor * shielding_factor
     
-    if zce_crew is None:
-        zce_crew = crew_zce(Fb=Fb, Boa=Boa, heel=heel)
+    zce_crew = resolve_crew_zce(
+        crew_position=crew_position,
+        zce_crew=zce_crew,
+        Fb=Fb,
+        Boa=Boa,
+        heel=heel,
+    )
     
     return windage_element(
         CdA_front=k * Cd_front * A_front,

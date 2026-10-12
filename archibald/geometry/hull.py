@@ -296,7 +296,7 @@ class Hull(ArchibaldObject):
             twa: float,
             method: Union[str, dict] = "orc",
             recompute_statics: bool = True,
-            rho_air: float = None,
+            crew_position: Union[np.ndarray, List] = None,
             **kwargs,
         ):
         """
@@ -310,6 +310,10 @@ class Hull(ArchibaldObject):
         method : str or dict, key of ``DEFAULT_WINDAGE_METHODS`` or custom dict of methods.
         recompute_statics : bool, whether to recompute the aerostatics of the hull.
         rho_air : float or None, air density [kg/m^3]. Default from the environment, else 1.225.
+        crew_position : (1, 3) or (3,) array or None, position (x, y, z) of the crew in the
+            boat frame [m], y being non zero for a crew hiking or on a trapeze. It is brought
+            in the water axes, and given to the windage methods as ``crew_position``, where the
+            "Crew" element uses its z coordinate as the height of its centre of effort.
         **kwargs : parameters of the windage methods (crew_mass, n_crew, Cd_hull, ...).
         
         Returns
@@ -325,9 +329,7 @@ class Hull(ArchibaldObject):
             self.compute_aerostatics_properties(op_point)
             
         g = op_point.environment.gravity
-        
-        if rho_air is None:
-            rho_air = get_air_density(op_point)
+        rho_air = op_point.environment.air.density
             
         env_params = {
             'g': g,                 # m/s^2
@@ -353,6 +355,11 @@ class Hull(ArchibaldObject):
         aero_data = dict(self.aerostatics_data)
         for key in ("cov", "cod", "cex", "cey"):
             aero_data[key] = op_point.apply_transformations(self.aerostatics_data[key])
+        
+        # The crew position is given only to the methods when defined, so that they can
+        # fall back on their default height otherwise.
+        if crew_position is not None:
+            aero_data["crew_position"] = op_point.apply_transformations(wide(np.array(crew_position)))
         
         if type(method)==str and method in DEFAULT_WINDAGE_METHODS.keys():
             process = DEFAULT_WINDAGE_METHODS[method]
@@ -388,22 +395,23 @@ class Hull(ArchibaldObject):
             twa: float,
             method: Union[str, dict] = "orc",
             recompute_statics: bool = True,
-            position: Union[np.ndarray, List] = None,
+            crew_position: Union[np.ndarray, List] = None,
             **kwargs,
         ):
         """
         Aerodynamic force and moment of the wind on the above-water part of the hull
         and on the crew, in the water axes. See ``compute_windage_components``.
         
-        Every element is applied at its own height, and at the horizontal position
-        of the lateral centre of effort of the hull (plus the offset ``dxce`` of the
-        method, if any), unless ``position`` is given.
+        The hull elements are applied at the horizontal position of the lateral centre
+        of effort of the hull (plus the offset ``dxce`` of the method, if any), and at
+        their own height. The "Crew" element is applied at ``crew_position`` if given,
+        otherwise like the hull elements.
         
         Parameters
         ----------
-        position : (1, 3) or (3,) array or None, point in the hull local frame whose
-            horizontal position (x, y) is used instead of the lateral centre of effort,
-            e.g. the position of the crew.
+        crew_position : (1, 3) or (3,) array or None, position (x, y, z) of the crew in the
+            boat frame [m]. The force is applied at this point, off the centreline if y
+            is not zero, which gives the yaw moment term -y * Fx.
         
         Returns
         -------
@@ -416,13 +424,14 @@ class Hull(ArchibaldObject):
             twa=twa,
             method=method,
             recompute_statics=recompute_statics,
+            crew_position=crew_position,
             **kwargs
         )
         
-        if position is None:
-            cey = op_point.apply_transformations(self.aerostatics_data['cey'])
-        else:
-            cey = op_point.apply_transformations(wide(np.array(position)))
+        cey = op_point.apply_transformations(self.aerostatics_data['cey'])
+        
+        if crew_position is not None:
+            crew_center = op_point.apply_transformations(wide(np.array(crew_position)))
         
         Fa = wide(np.zeros(3))
         Ma = wide(np.zeros(3))
@@ -435,8 +444,14 @@ class Hull(ArchibaldObject):
                 wide(np.array([1., 0., 0.])) * c["Fx"]
                 + wide(np.array([0., 1., 0.])) * c["Fy"]
             )
+            # horizontal position of the application point
+            if name == "Crew" and crew_position is not None:
+                xy = crew_center
+            else:
+                xy = cey
+            
             center = (
-                cey * wide(np.array([1., 1., 0.]))
+                xy * wide(np.array([1., 1., 0.]))
                 + wide(np.array([1., 0., 0.])) * c["dxce"]
                 + wide(np.array([0., 0., 1.])) * c["zce"]
             )

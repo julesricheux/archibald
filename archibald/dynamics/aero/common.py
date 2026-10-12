@@ -148,3 +148,36 @@ def crew_zce(
     (ORC VPP): 0.5 m above the deck edge, raised by the heel since the crew sits on the rail.
     """
     return Fb + 0.5 + 0.5 * Boa * smooth_abs_sind(heel)
+
+
+def resolve_crew_zce(
+        crew_position,
+        zce_crew,
+        Fb,
+        Boa,
+        heel,
+    ):
+    """
+    Height of the crew centre of effort above the waterplane [m], by priority:
+    
+    1. ``zce_crew``, if given;
+    2. the z coordinate of ``crew_position``, if given. This 3D position is
+       expressed in the water axes (heel, trim and draft of the operating point
+       included), so a crew hiking on the windward rail is correctly higher
+       when the boat heels, and lower when it is on the leeward side;
+    3. the ORC default, see ``crew_zce``, which assumes a crew on the rail
+       whatever the side.
+
+    Parameters
+    ----------
+    crew_position : (1, 3) array or None, Position of the crew in the water axes [m].
+    zce_crew : float or None, Explicit height above the waterplane [m].
+    Fb, Boa, heel : Mean freeboard [m], overall beam [m] and heel angle [deg] for the default.
+    """
+    if zce_crew is not None:
+        return zce_crew
+    
+    if crew_position is not None:
+        return crew_position[0, 2]
+    
+    return crew_zce(Fb=Fb, Boa=Boa, heel=heel)
