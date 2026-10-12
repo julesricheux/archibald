@@ -897,7 +897,7 @@ class ArchibaldMesh(ArchibaldObject):
         # whose apex is the origin: (v0 + v1 + v2) / 4. The volumes above are
         # signed with respect to ref_point, so the apex is ref_point and the
         # centroid is (ref_point + v0 + v1 + v2) / 4, hence the ref_point / 4 term.
-        tetra_centers = self._data['tetrahedron_centers'] + wide(ref_point) / 4.0
+        tetra_centers = np.add(self._data['tetrahedron_centers'], wide(ref_point) / 4.0)
         tetra_volumes = tall(self._data['tetrahedron_volumes']) * tall(weight)
         
         # Weighted sum of centroids by volumes to get the total center of mass

@@ -16,21 +16,21 @@ from archibald.toolbox.mesh_utils import load_stl
 
 from archibald.toolbox.math_utils import waterplane_normal
 
-from archibald.dynamics.hydro import savitsky, holtrop
+from archibald.dynamics.hydro import savitsky, holtrop, dsyhs
 
 DEFAULT_RESISTANCE_METHODS = {
-    # "dsyhs": {
-    #     "Rf": dsyhs.compute_Rf_dsyhs,
-    #     "Rw": dsyhs.compute_Rw_dsyhs,
-    #     "Rtr": dsyhs.compute_Rtr_dsyhs,
-    # },
-    # "holtrop": {
-    #     "Rf": holtrop.compute_Rf_holtrop,
-    #     "Rw": holtrop.compute_Rw_holtrop,
-    #     "Rb": holtrop.compute_Rb_holtrop,
-    #     "Rtr": holtrop.compute_Rtr_holtrop,
-    #     "Ra": holtrop.compute_Ra_holtrop,
-    # },
+    "dsyhs": {
+        "Rf": dsyhs.compute_Rf_dsyhs,
+        "Rw": dsyhs.compute_Rw_dsyhs,
+        "Rtr": dsyhs.compute_Rtr_dsyhs,
+    },
+    "holtrop": {
+        "Rf": holtrop.compute_Rf_holtrop,
+        "Rw": holtrop.compute_Rw_holtrop,
+        "Rb": holtrop.compute_Rb_holtrop,
+        "Rtr": holtrop.compute_Rtr_holtrop,
+        "Ra": holtrop.compute_Ra_holtrop,
+    },
     "savitsky": {
         "Rf": savitsky.compute_Rf_savitsky,
         "Rp": savitsky.compute_Rp_savitsky,
