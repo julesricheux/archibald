@@ -13,8 +13,18 @@ import archibald.numpy as np
 import archibald.toolbox.units as u
 
 from archibald.dynamics.hydro.multihull_common import (
-    EPS, nodes_unit, simpson_weights, k_0,
+    EPS, nodes_unit, simpson_weights, k_0, smooth_clip,
 )
+
+#%% VALIDITY RANGE OF THE EQUIVALENT HULL
+
+# Bounds of the shape coefficients. Hydrostatics of a hull that is about to leave
+# the water (or just left it) give degenerate values (Cp < 0, Cp = 0, Cx > 1...),
+# for which the shape exponents p, q and r are not defined or diverge.
+CP_MIN, CP_MAX = 0.15, 0.92
+CX_MIN, CX_MAX = 0.40, 0.95
+T_FLOOR = 0.01      # [m] lowest draught used for the truncation of the integral
+S_MAX = 3.          # largest rescaling of the Kochin amplitude by the calibration
 
 #%% INDIVIDUAL COEFFICIENTS
 
@@ -188,6 +198,14 @@ def kochin_amplitude(
     array, Kochin amplitude A(u) [m²].
     """
     _k0 = k_0(stw=stw, g=g)
+
+    # Hull close to or out of the water: smooth floors and bounds, so that the
+    # amplitude (proportional to the draught) vanishes instead of diverging
+    Lwl = np.softplus(Lwl, beta=1e3)
+    Bwl = np.softplus(Bwl, beta=1e3)
+    T = np.softplus(T, beta=1e3)
+    Cp = smooth_clip(Cp, CP_MIN, CP_MAX)
+    Cx = smooth_clip(Cx, CX_MIN, CX_MAX)
     p, q, r = p_exp(Cp), q_exp(Cx), r_exp(Cp)
     k = _k0 * np.sqrt(1. + u_nodes ** 2)
     a = _k0 * (1. + u_nodes ** 2)
@@ -263,6 +281,7 @@ def compute_Rw_matrix_michell(
     T_ref = T[0]
     for Ti in T[1:]:
         T_ref = np.maximum(T_ref, Ti)
+    T_ref = np.maximum(T_ref, T_FLOOR)
 
     un, w = u_nodes_michell(stw=stw, T=T_ref, g=g, n_u=n_u)
     _k0 = k_0(stw=stw, g=g)
@@ -340,6 +359,7 @@ def compute_dRw_michell(
         g,
         Rw=None,
         calibrate=True,
+        s_max=S_MAX,
         **kwargs,
     ):
     r"""Wave interference matrix between n hulls from Michell theory.
@@ -368,6 +388,9 @@ def compute_dRw_michell(
     g : float, Gravitational acceleration [m/s²].
     Rw : list of float or None, Individual wave resistance of each hull [N].
     calibrate : bool, Whether to rescale on the individual Rw.
+    s_max : float, The rescaling factor s_i is kept in [1/s_max, s_max]. It is
+        needed when a hull is hardly wet: its Michell self resistance vanishes
+        while the empirical one does not, and the ratio would diverge.
 
     Returns
     -------
@@ -380,7 +403,10 @@ def compute_dRw_michell(
     )
     s = [1. for _ in range(n)]
     if calibrate and Rw is not None:
-        s = [np.sqrt(Rw[i] / (R[i][i] + EPS)) for i in range(n)]
+        s = [
+            smooth_clip(np.sqrt(Rw[i] / (R[i][i] + EPS)), 1. / s_max, s_max)
+            for i in range(n)
+        ]
     return [
         [0. if i == j else s[i] * s[j] * R[i][j] for j in range(n)]
         for i in range(n)

@@ -73,7 +73,7 @@ def froude_number(
     -------
     float, Froude number [-].
     """
-    return np.softplus(stw * u.kt, beta=1e3) / np.sqrt(g * L)
+    return np.softplus(stw * u.kt, beta=1e3) / np.sqrt(g * L + 1e-6)
 
 
 def separation_to_length(
@@ -178,3 +178,60 @@ def interp_nodes(
         out = out + values[j] * np.where(x < grid[j], wl, wr)
     return out
 
+#%% ROBUSTNESS HELPERS (HULLS CLOSE TO OR OUT OF THE WATER)
+
+def smooth_clip(
+        x,
+        lo,
+        hi,
+        eps=1e-4,
+        **kwargs,
+    ):
+    r"""Smooth, differentiable and overflow free clipping of x in [lo, hi].
+
+    .. math::
+        \text{clip}(x) = \frac{1}{2}\left(lo + hi
+            + \sqrt{(x - lo)^2 + \epsilon} - \sqrt{(x - hi)^2 + \epsilon}\right)
+
+    Equal to x inside the interval, to lo / hi outside (up to a smoothing of
+    order :math:`\sqrt{\epsilon}`), whatever the magnitude of x.
+
+    Parameters
+    ----------
+    x : float, Value to clip.
+    lo, hi : float, Bounds, lo < hi.
+    eps : float, Smoothing parameter.
+
+    Returns
+    -------
+    float, Clipped value.
+    """
+    return 0.5 * (lo + hi + np.sqrt((x - lo) ** 2 + eps) - np.sqrt((x - hi) ** 2 + eps))
+
+
+def immersion_weight(
+        T,
+        T_kiss=0.01,
+        **kwargs,
+    ):
+    r"""Smooth weight of a hull going out of the water.
+
+    .. math::
+        w = \frac{T^2}{T^2 + T_{kiss}^2}
+
+    It is 1 for a normally immersed hull (T >> T_kiss), and tends to 0 when
+    the hull lifts out of the water, so that the interference of a hull that is
+    not (or hardly) wet vanishes smoothly. A negative or zero draught (hull
+    out of the water) gives 0.
+
+    Parameters
+    ----------
+    T : float, Draught of the hull [m].
+    T_kiss : float, Draught at which the weight is 1/2 [m].
+
+    Returns
+    -------
+    float, Immersion weight in [0, 1].
+    """
+    Tp = 0.5 * (T + np.sqrt(T ** 2 + 1e-8))   # smooth ReLU, ~5e-5 m at T = 0
+    return Tp ** 2 / (Tp ** 2 + T_kiss ** 2)

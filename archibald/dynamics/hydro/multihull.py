@@ -16,6 +16,7 @@ interference attributed to hull i (half of each pair).
 #%% DEPENDENCIES
 
 from archibald.dynamics.hydro import michell, insel_molland, miyazawa, jamaluddin
+from archibald.dynamics.hydro.multihull_common import immersion_weight
 
 #%% METHODS
 
@@ -61,6 +62,7 @@ def compute_hull_interaction(
         rho=None,
         g=None,
         nu=None,
+        T_kiss=0.01,
         **kwargs,
     ):
     """Interaction resistance between the hulls of a multihull.
@@ -82,6 +84,9 @@ def compute_hull_interaction(
     rho : float or None, Water density [kg/m³]; default from ``op_point.environment``.
     g : float or None, Gravitational acceleration [m/s²]; default from ``op_point.environment``.
     nu : float or None, Kinematic viscosity [m²/s]; default from ``op_point.environment``.
+    T_kiss : float, Draught [m] at which the interference of a hull is halved. The
+        interference of a hull is weighted by ``immersion_weight`` so that it
+        vanishes smoothly when the hull lifts out of the water (heel).
     **kwargs : Method parameters (``calibrate``, ``fn_grid``, ``sl_grid``, ``tau_table``...).
 
     Returns
@@ -124,6 +129,14 @@ def compute_hull_interaction(
         dRw = process["Rw"](**args)
     if "Rf" in process:
         dRf = process["Rf"](**args)
+
+    # A hull that is hardly wet (or out of the water) neither makes waves nor
+    # disturbs the flow around the others: smooth weights of the pairs
+    w = [immersion_weight(args["T"][i], T_kiss=T_kiss) for i in range(n)]
+    dRw = [[dRw[i][j] * w[i] * w[j] for j in range(n)] for i in range(n)]
+    for i in range(n):
+        others = sum(w[j] for j in range(n) if j != i) / max(n - 1, 1)
+        dRf[i] = dRf[i] * w[i] * others
 
     dR_hull = [sum(dRw[i]) + dRf[i] for i in range(n)]
     return {"dRw": dRw, "dRf": dRf, "dR_hull": dR_hull, "dR": sum(dR_hull)}

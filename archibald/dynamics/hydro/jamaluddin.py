@@ -19,7 +19,7 @@ the primary sources have not been checked: validate before relying on them.
 import archibald.numpy as np
 
 from archibald.dynamics.hydro.multihull_common import (
-    EPS, froude_number, separation_to_length, interp_nodes,
+    EPS, froude_number, separation_to_length, interp_nodes, smooth_clip,
 )
 
 #%% COEFFICIENTS
@@ -117,7 +117,9 @@ def viscous_interference_ratio(
     float, Relative viscous interference [-].
     """
     SLc = np.maximum(SL, SL_MIN)
-    slenderness = Lwl / (volume + EPS) ** (1. / 3.)
+    # bounded: a hull that is hardly wet has a vanishing volume
+    Vp = 0.5 * (volume + np.sqrt(volume ** 2 + 1e-12)) + EPS    # smooth ReLU: V >= 0
+    slenderness = smooth_clip(Lwl / Vp ** (1. / 3.), 5., 14.)
     return 0.016 * SLc ** (-0.65) / (3.03 * slenderness ** (-0.40))
 
 #%% RESISTANCE COMPONENTS
