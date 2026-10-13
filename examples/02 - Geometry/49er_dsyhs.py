@@ -15,7 +15,7 @@ from archibald.toolbox.mesh_utils import load_stl
 
 from archibald.toolbox.math_utils import waterplane_normal
 
-from archibald.dynamics.hydro import savitsky, holtrop
+from archibald.dynamics.hydro import savitsky, holtrop, dsyhs
 
 import matplotlib.pyplot as plt
 import seaborn as sns

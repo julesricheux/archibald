@@ -52,7 +52,11 @@ _keunig_coefs = {
     'a7': np.array([0.,+0.0052, -0.0020, -0.0043, -0.0172, -0.0078, +0.1115, +0.2086, +0.1336, -0.2272, -0.3352, -0.4632, -0.4477, -0.0977])
 }
 
-
+_keunig_end_slopes = {
+    k: float((_keunig_coefs[k][-1] - _keunig_coefs[k][-2]) /
+             (_keunig_coefs["Fr"][-1] - _keunig_coefs["Fr"][-2]))
+    for k in (f"a{i}" for i in range(8))
+}
 
 _keunig_interpolators = {}
 
@@ -224,7 +228,7 @@ def compute_Rw_dsyhs(
     Rw     : float, Residuary resistance [N]
     """
     
-    extrap_Fr = np.softplus(Fr - 0.75, 1e3)
+    excess_Fr = np.softplus(Fr - 0.75, 1e3)
     Fr = smooth_clip(Fr, 0, 0.75, beta=20)
     
     a = []
@@ -254,7 +258,7 @@ def compute_Rw_dsyhs(
     
     # print(extrap_Fr)
     
-    resistance_coeff *= (1 + extrap_Fr)
+    resistance_coeff *= (1 + excess_Fr)
     
     if not np.is_casadi_type(resistance_coeff):
         resistance_coeff = np.squeeze(resistance_coeff)
