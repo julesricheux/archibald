@@ -55,7 +55,7 @@ overhang = 3.775 # deg for 49er
 opti = Opti()
 
 T = opti.variable(init_guess=0.)
-trim = 4
+trim = 3
 
 op_point = OperatingPoint(
     dz=-T,

@@ -45,9 +45,68 @@ from archibald.dynamics.hydro.common import Cf_hull
 #%% CONSTANTS
 
 _DEG = np.pi / 180.   # [rad/deg]
-TAU_MIN = 0.3         # Smooth lower bound of the trim angle [deg]
-LAMBDA_MIN = 0.05     # Smooth lower bound of the wetted length ratio [-]
+TAU_MIN = 0.1         # Smooth lower bound of the trim angle [deg]
+LAMBDA_MIN = 0.01     # Smooth lower bound of the wetted length ratio [-]
 TAU_SPRAY_MIN = 2.0   # Trim angle defining the lower bound of the spray line angle [deg]
+
+#%% HELPER
+
+def smooth_clip(x, a, b, beta=10.0):
+    r"""
+    Smooth and differentiable clipping function bounded between [a, b] 
+    using np.softplus, suitable for gradient-based optimization (IPOPT).
+    
+    Parameters
+    ----------
+    x : float or ndarray, Input value(s) to clip.
+    a : float, Lower bound.
+    b : float, Upper bound.
+    beta : float, Steepness factor for the transition smoothing (higher = sharper).
+    
+    Returns
+    -------
+    float or ndarray, Smoothed and clipped values.
+    """
+    # 1. Smooth lower bound (smooth maximum with 'a')
+    # Equivalent to: max(x, a) smoothly smoothed out
+    x_lower = a + np.softplus(x - a, beta=beta)
+    
+    # 2. Smooth upper bound (smooth minimum with 'b')
+    # Derived via symmetry: min(y, b) = -max(-y, -b)
+    x_clipped = b - np.softplus(b - x_lower, beta=beta)
+    
+    return x_clipped
+
+
+def smooth_ramp(x, a, b, beta=10.0):
+    """
+    Smooth and differentiable ramp function from 0 to 1 over the interval [a, b],
+    suitable for gradient-based optimization (IPOPT).
+    """
+    clipped = smooth_clip(x, a, b, beta=beta)
+    return (clipped - a) / (b - a)
+
+
+def validity_factor(
+        stw,
+        Bwl,
+        g,
+        trim,
+        **kwargs,
+    ):
+    
+    _Cv = C_v(stw=stw, Bwl=Bwl, g=g)
+    _tau = tau(trim)
+    
+    beta = 20.
+    rules = np.array([
+        smooth_ramp(_Cv, 0.6, 1.0, beta=beta), # Cv > 0.60, better for Cv > 1.0
+        # smooth_ramp(_tau, 0.0, 2.0, beta=beta), # tau > 2.0 deg
+    ])
+    
+    # print(rules)
+    
+    return np.prod(rules)
 
 #%% INDIVIDUAL COEFFICIENTS
 
@@ -68,7 +127,7 @@ def tau(
     -------
     float, Effective trim angle tau [deg].
     """
-    return TAU_MIN + np.softplus(trim - TAU_MIN, beta=5.)
+    return TAU_MIN + np.softplus(trim - TAU_MIN, beta=10.)
 
 
 def C_v(
