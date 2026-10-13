@@ -15,7 +15,7 @@ from archibald.toolbox.mesh_utils import load_stl
 
 from archibald.toolbox.math_utils import waterplane_normal
 
-from archibald.dynamics.hydro import savitsky, holtrop, dsyhs
+from archibald.dynamics.hydro import savitsky, holtrop, dsyhs, michell
 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -47,6 +47,7 @@ DEFAULT_RESISTANCE_METHODS = {
     "composite": {
         "Rf": dsyhs.compute_Rf_dsyhs,
         # "Rf": holtrop.compute_Rf_holtrop,
+        # "Rw": michell.compute_Rw_michell,
         "Rw": dsyhs.compute_Rw_dsyhs,
         "Rtr": dsyhs.compute_Rtr_dsyhs,
         
@@ -105,13 +106,15 @@ for s in stw:
         mesh=hullStl,
     )
     
+    T = -3e-2
+    # trim = 2. + overhang
     T = 0.
-    trim = 2. + overhang
-    # trim = 0.
+    trim = 0.
+    # trim = 2.
     
     T = opti.variable(init_guess=T)
     # trim = opti.variable(init_guess=trim, lower_bound=overhang + 2.)
-    # trim = opti.variable(init_guess=trim, lower_bound=-1., upper_bound=s/2.)
+    trim = opti.variable(init_guess=trim, lower_bound=-1., upper_bound=s)
     
     op_point = OperatingPoint(
         stw=s,
@@ -136,7 +139,8 @@ for s in stw:
         op_point,
         method=DEFAULT_RESISTANCE_METHODS["composite"],
         **{'Csternchoice': 1, 'Bulbchoice': 0},
-        **{'trim': trim - overhang, 'deadrise': 3, "use_Aws": True},
+        **{'trim': trim, 'deadrise': 3, "use_Aws": True},
+        # **{'trim': trim - overhang, 'deadrise': 3, "use_Aws": True},
     )
         
     froude =  op_point._stw / np.sqrt(hull.hydrostatics_data["Lwl"] * 9.8066)
@@ -259,7 +263,7 @@ ax.set_xlim(stw[0], stw[-1])
 # ax.grid(True, alpha=0.2)
 ax.legend()
 
-plt.xlim(stw[0], stw[-1])
+plt.xlim(0., stw[-1])
 plt.ylim(0, 70)
 
 fig.tight_layout()
