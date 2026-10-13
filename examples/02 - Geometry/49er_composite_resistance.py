@@ -106,12 +106,12 @@ for s in stw:
     )
     
     T = 0.
-    # trim = 2. + overhang
-    trim = 0.
+    trim = 2. + overhang
+    # trim = 0.
     
     T = opti.variable(init_guess=T)
     # trim = opti.variable(init_guess=trim, lower_bound=overhang + 2.)
-    trim = opti.variable(init_guess=trim, lower_bound=-3., upper_bound=10. + overhang)
+    # trim = opti.variable(init_guess=trim, lower_bound=-1., upper_bound=s/2.)
     
     op_point = OperatingPoint(
         stw=s,
@@ -172,7 +172,11 @@ for s in stw:
         ((volume - ref) * rho * 9.8066 + Fz) == 0.,
     ])
     
-    sol = opti.solve(max_iter=200, behavior_on_failure="return_last", verbose=False)
+    sol = opti.solve(
+        max_iter=300,
+        behavior_on_failure="return_last",
+        # verbose=False
+    )
     
     hrc = sol(hull.resistance_components)
     

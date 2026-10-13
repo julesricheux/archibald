@@ -40,16 +40,28 @@ def smooth_clip(x, a, b, beta=10.0):
 
 # DSYHS residuary resistance coefs
 # Coefficients a0 to a7
+# _keunig_coefs = {
+#     'Fr': np.array([0.,   0.15,    0.20,    0.25,    0.30,    0.35,    0.40,    0.45,    0.50,    0.55,    0.60,    0.65,    0.70,    0.75]),
+#     'a0': np.array([0.,-0.0005, -0.0003, -0.0002, -0.0009, -0.0026, -0.0064, -0.0218, -0.0388, -0.0347, -0.0361, +0.0008, +0.0108, +0.1023]),
+#     'a1': np.array([0.,+0.0023, +0.0059, -0.0156, +0.0016, -0.0567, -0.4034, -0.5261, -0.5986, -0.4764, +0.0037, +0.3728, -0.1238, +0.7726]),
+#     'a2': np.array([0.,-0.0086, -0.0064, +0.0031, +0.0337, +0.0446, -0.1250, -0.2945, -0.3038, -0.2361, -0.2960, -0.3667, -0.2026, +0.5040]),
+#     'a3': np.array([0.,-0.0015, +0.0070, -0.0021, -0.0285, -0.1091, +0.0273, +0.2485, +0.6033, +0.8726, +0.9661, +1.3957, +1.1282, +1.7867]),
+#     'a4': np.array([0.,+0.0061, +0.0014, -0.0070, -0.0367, -0.0707, -0.1341, -0.2428, -0.0430, +0.4219, +0.6123, +1.0343, +1.1836, +2.1934]),
+#     'a5': np.array([0.,+0.0010, +0.0013, +0.0148, +0.0218, +0.0914, +0.3578, +0.6293, +0.8332, +0.8990, +0.7534, +0.3230, +0.4973, -1.5479]),
+#     'a6': np.array([0.,+0.0001, +0.0005, +0.0010, +0.0015, +0.0021, +0.0045, +0.0081, +0.0106, +0.0096, +0.0100, +0.0072, +0.0038, -0.0115]),
+#     'a7': np.array([0.,+0.0052, -0.0020, -0.0043, -0.0172, -0.0078, +0.1115, +0.2086, +0.1336, -0.2272, -0.3352, -0.4632, -0.4477, -0.0977])
+# }
+
 _keunig_coefs = {
-    'Fr': np.array([0.,   0.15,    0.20,    0.25,    0.30,    0.35,    0.40,    0.45,    0.50,    0.55,    0.60,    0.65,    0.70,    0.75]),
-    'a0': np.array([0.,-0.0005, -0.0003, -0.0002, -0.0009, -0.0026, -0.0064, -0.0218, -0.0388, -0.0347, -0.0361, +0.0008, +0.0108, +0.1023]),
-    'a1': np.array([0.,+0.0023, +0.0059, -0.0156, +0.0016, -0.0567, -0.4034, -0.5261, -0.5986, -0.4764, +0.0037, +0.3728, -0.1238, +0.7726]),
-    'a2': np.array([0.,-0.0086, -0.0064, +0.0031, +0.0337, +0.0446, -0.1250, -0.2945, -0.3038, -0.2361, -0.2960, -0.3667, -0.2026, +0.5040]),
-    'a3': np.array([0.,-0.0015, +0.0070, -0.0021, -0.0285, -0.1091, +0.0273, +0.2485, +0.6033, +0.8726, +0.9661, +1.3957, +1.1282, +1.7867]),
-    'a4': np.array([0.,+0.0061, +0.0014, -0.0070, -0.0367, -0.0707, -0.1341, -0.2428, -0.0430, +0.4219, +0.6123, +1.0343, +1.1836, +2.1934]),
-    'a5': np.array([0.,+0.0010, +0.0013, +0.0148, +0.0218, +0.0914, +0.3578, +0.6293, +0.8332, +0.8990, +0.7534, +0.3230, +0.4973, -1.5479]),
-    'a6': np.array([0.,+0.0001, +0.0005, +0.0010, +0.0015, +0.0021, +0.0045, +0.0081, +0.0106, +0.0096, +0.0100, +0.0072, +0.0038, -0.0115]),
-    'a7': np.array([0.,+0.0052, -0.0020, -0.0043, -0.0172, -0.0078, +0.1115, +0.2086, +0.1336, -0.2272, -0.3352, -0.4632, -0.4477, -0.0977])
+    'Fr': np.array([0.,   0.15,    0.20,    0.25,    0.30,    0.35,    0.40,    0.45,    0.50,    0.55,    0.60,    0.65,    0.70,]),
+    'a0': np.array([0.,-0.0005, -0.0003, -0.0002, -0.0009, -0.0026, -0.0064, -0.0218, -0.0388, -0.0347, -0.0361, +0.0008, +0.0108,]),
+    'a1': np.array([0.,+0.0023, +0.0059, -0.0156, +0.0016, -0.0567, -0.4034, -0.5261, -0.5986, -0.4764, +0.0037, +0.3728, -0.1238,]),
+    'a2': np.array([0.,-0.0086, -0.0064, +0.0031, +0.0337, +0.0446, -0.1250, -0.2945, -0.3038, -0.2361, -0.2960, -0.3667, -0.2026,]),
+    'a3': np.array([0.,-0.0015, +0.0070, -0.0021, -0.0285, -0.1091, +0.0273, +0.2485, +0.6033, +0.8726, +0.9661, +1.3957, +1.1282,]),
+    'a4': np.array([0.,+0.0061, +0.0014, -0.0070, -0.0367, -0.0707, -0.1341, -0.2428, -0.0430, +0.4219, +0.6123, +1.0343, +1.1836,]),
+    'a5': np.array([0.,+0.0010, +0.0013, +0.0148, +0.0218, +0.0914, +0.3578, +0.6293, +0.8332, +0.8990, +0.7534, +0.3230, +0.4973,]),
+    'a6': np.array([0.,+0.0001, +0.0005, +0.0010, +0.0015, +0.0021, +0.0045, +0.0081, +0.0106, +0.0096, +0.0100, +0.0072, +0.0038,]),
+    'a7': np.array([0.,+0.0052, -0.0020, -0.0043, -0.0172, -0.0078, +0.1115, +0.2086, +0.1336, -0.2272, -0.3352, -0.4632, -0.4477,])
 }
 
 _keunig_end_slopes = {
@@ -228,8 +240,10 @@ def compute_Rw_dsyhs(
     Rw     : float, Residuary resistance [N]
     """
     
-    excess_Fr = np.softplus(Fr - 0.75, 1e3)
-    Fr = smooth_clip(Fr, 0, 0.75, beta=20)
+    Fr_max = _keunig_coefs["Fr"][-1]
+    
+    excess_Fr = np.softplus(Fr - Fr_max, 1e3)
+    Fr = smooth_clip(Fr, 0, Fr_max, beta=20)
     
     a = []
 
@@ -257,6 +271,9 @@ def compute_Rw_dsyhs(
     resistance_coeff = a[0] + (term1 * vol_ratio) + (term2 * vol_ratio)
     
     # print(extrap_Fr)
+    
+    # print(Fr, (a[6] * Bwl / (T + 1e-12)))
+    # print(1 + excess_Fr)
     
     resistance_coeff *= (1 + excess_Fr)
     
@@ -406,6 +423,7 @@ if __name__=="__main__":
     #     'Aws': 15.,
     # }
     
+    # MOLENEZ II
     hull_params = {
         'Fr': 0.3,
     
@@ -448,18 +466,47 @@ if __name__=="__main__":
         # To be supplied separately:
         # 'kyy': ...,
     }
+        
+    # TRIMMED 49er
+    # hull_params = {'volume': 0.1393596784036322,
+    #      'cob': np.array([ 5.26e-01,  1.51e-07, -1.45e-02]),
+    #      'Aws': 2.087198803536013,
+    #      'cow': np.array([ 4.60e-01,  2.44e-08, -3.75e-02]),
+    #      'cof': np.array([ 1.23e+00,  7.90e-08, -2.61e-02]),
+    #      'T': 0.27538997584829705,
+    #      'Ttr': 0.27538997584829705,
+    #      'Lwl': 1.61396370576692,
+    #      'Lbp': 1.61396370576692,
+    #      'Bwl': 1.4763862903018294,
+    #      'Ax': 0.3189070527300096,
+    #      'Ay': 0.18171187951249143,
+    #      'Atr': 0.1786702866868349,
+    #      'Awp': 2.977836578024428,
+    #      'Cb': 0.21237101346426612,
+    #      'Cp': 0.2707567218574761,
+    #      'Cx': 0.784361001295639,
+    #      'Cy': 0.4088287492963387,
+    #      'Cwp': 0.999,
+    #      'ie': 0.0020676786524235916,
+    #      'fpp': np.array([ 1.81e+00,  7.33e-06, -1.04e-01]),
+    #      'app': np.array([2.15e-01, 7.33e-06, 1.11e-01]),
+    #      'LCB_fpp': 1.2885814676990712,
+    #      'LCF_fpp': 0.5852325387107029,
+    #      'lcb': -0.29839556682346036,
+    #      'Abt': 0.0,
+    #      'hB': 0.13769498792414853}
     
-    hull_params["stw"] = hull_params['Fr']*np.sqrt(env_params['g']*hull_params['Lwl'])/u.kt
-    hull_params["Re"] = hull_params['stw']*u.kt / (1.220e-6 * hull_params['Lwl'])
+    # hull_params["stw"] = hull_params['Fr']*np.sqrt(env_params['g']*hull_params['Lwl'])/u.kt
+    # hull_params["Re"] = hull_params['stw']*u.kt / (1.220e-6 * hull_params['Lwl'])
     
-    Rf = compute_Rf_dsyhs(**hull_params, **env_params)
-    Rw = compute_Rw_dsyhs(**hull_params, **env_params)
-    # Raw = compute_Raw_dsyhs(**hull_params, **env_params)
-    Raw = 0.
-    print(f"Boat speed: {hull_params['Fr']*np.sqrt(env_params['g']*hull_params['Lwl'])/u.kt:.2f} kts")
-    print(f"Calculated Frictionnal Resistance: {Rf:.2f} N")
-    print(f"Calculated Residuary Resistance: {Rw:.2f} N")
-    print(f"Calculated Added wave Resistance: {Raw:.2f} N")
+    # Rf = compute_Rf_dsyhs(**hull_params, **env_params)
+    # Rw = compute_Rw_dsyhs(**hull_params, **env_params)
+    # # Raw = compute_Raw_dsyhs(**hull_params, **env_params)
+    # Raw = 0.
+    # print(f"Boat speed: {hull_params['Fr']*np.sqrt(env_params['g']*hull_params['Lwl'])/u.kt:.2f} kts")
+    # print(f"Calculated Frictionnal Resistance: {Rf:.2f} N")
+    # print(f"Calculated Residuary Resistance: {Rw:.2f} N")
+    # print(f"Calculated Added wave Resistance: {Raw:.2f} N")
     
     import matplotlib.pyplot as plt
     
@@ -552,19 +599,19 @@ if __name__=="__main__":
         100
     )
     
-    # for i in range(8):
-    #     # 3. Evaluate the interpolator
+    for i in range(8):
+        # 3. Evaluate the interpolator
         
-    #     y_data = _keunig_coefs[f"a{i}"]
-    #     y_interp = _keunig_interpolators[f"a{i}"](x_fine)
+        y_data = _keunig_coefs[f"a{i}"]
+        y_interp = _keunig_interpolators[f"a{i}"](x_fine)
     
-    #     # 4. Plot results
-    #     plt.figure(figsize=(8, 5))
-    #     plt.plot(x_coords, y_data, 'ok', label="Original Data Points")
-    #     plt.plot(x_fine, y_interp, '-', label="B-Spline Interpolation")
-    #     plt.legend()
-    #     plt.grid()
-    #     plt.title(f"1D Interpolation for coef a{i}")
-    #     plt.xlabel("Froude")
-    #     # plt.ylabel("y")
-    #     plt.show()
+        # 4. Plot results
+        plt.figure(figsize=(8, 5))
+        plt.plot(x_coords, y_data, 'ok', label="Original Data Points")
+        plt.plot(x_fine, y_interp, '-', label="B-Spline Interpolation")
+        plt.legend()
+        plt.grid()
+        plt.title(f"1D Interpolation for coef a{i}")
+        plt.xlabel("Froude")
+        # plt.ylabel("y")
+        plt.show()
