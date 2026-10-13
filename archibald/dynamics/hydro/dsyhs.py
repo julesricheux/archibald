@@ -6,6 +6,38 @@ import archibald.toolbox.units as u
 from archibald.modeling import InterpolatedModel
 from archibald.dynamics.hydro.common import Cf_hull, transom_resistance
 
+#%% HELPER
+
+#TODO move to share in toolbox, or NumPy
+
+def smooth_clip(x, a, b, beta=10.0):
+    r"""
+    Smooth and differentiable clipping function bounded between [a, b] 
+    using np.softplus, suitable for gradient-based optimization (IPOPT).
+    
+    Parameters
+    ----------
+    x : float or ndarray, Input value(s) to clip.
+    a : float, Lower bound.
+    b : float, Upper bound.
+    beta : float, Steepness factor for the transition smoothing (higher = sharper).
+    
+    Returns
+    -------
+    float or ndarray, Smoothed and clipped values.
+    """
+    # 1. Smooth lower bound (smooth maximum with 'a')
+    # Equivalent to: max(x, a) smoothly smoothed out
+    x_lower = a + np.softplus(x - a, beta=beta)
+    
+    # 2. Smooth upper bound (smooth minimum with 'b')
+    # Derived via symmetry: min(y, b) = -max(-y, -b)
+    x_clipped = b - np.softplus(b - x_lower, beta=beta)
+    
+    return x_clipped
+
+#%%
+
 # DSYHS residuary resistance coefs
 # Coefficients a0 to a7
 _keunig_coefs = {
@@ -20,6 +52,8 @@ _keunig_coefs = {
     'a7': np.array([0.,+0.0052, -0.0020, -0.0043, -0.0172, -0.0078, +0.1115, +0.2086, +0.1336, -0.2272, -0.3352, -0.4632, -0.4477, -0.0977])
 }
 
+
+
 _keunig_interpolators = {}
 
 for i in range(8):
@@ -29,11 +63,6 @@ for i in range(8):
         # method="linear",
         method="bspline",
     )
-    # _keunig_interpolators[f"a{i}"] = UnstructuredInterpolatedModel(
-    #     x_data=_keunig_coefs["Fr"],
-    #     y_data=_keunig_coefs[f"a{i}"],
-    #     # method="bspline",
-    # )
 
 
 # DSYHS added wave resistance coefs
@@ -195,6 +224,9 @@ def compute_Rw_dsyhs(
     Rw     : float, Residuary resistance [N]
     """
     
+    extrap_Fr = np.softplus(Fr - 0.75, 1e3)
+    Fr = smooth_clip(Fr, 0, 0.75, beta=20)
+    
     a = []
 
     for i in range(8):
@@ -219,6 +251,10 @@ def compute_Rw_dsyhs(
     
     # Calculate the non-dimensional resistance coefficient
     resistance_coeff = a[0] + (term1 * vol_ratio) + (term2 * vol_ratio)
+    
+    # print(extrap_Fr)
+    
+    resistance_coeff *= (1 + extrap_Fr)
     
     if not np.is_casadi_type(resistance_coeff):
         resistance_coeff = np.squeeze(resistance_coeff)
@@ -427,7 +463,7 @@ if __name__=="__main__":
     # above this code block, along with `archibald.toolbox.units as u`.
     
     # 1. Define the range of Froude numbers to sweep (e.g., 0.15 to 0.60)
-    fr_array = np.linspace(0.0, 0.1, 50)
+    fr_array = np.linspace(0.0, 1., 50)
     
     # Arrays to store the calculated resistances
     Rf_list = []
@@ -504,13 +540,13 @@ if __name__=="__main__":
     plt.show()
     
     # PLOT
-    # import matplotlib.pyplot as plt
-    # x_coords = _keunig_coefs["Fr"]
-    # x_fine = np.linspace(
-    #     _keunig_coefs["Fr"].min(), 
-    #     _keunig_coefs["Fr"].max(), 
-    #     100
-    # )
+    import matplotlib.pyplot as plt
+    x_coords = _keunig_coefs["Fr"]
+    x_fine = np.linspace(
+        _keunig_coefs["Fr"].min(), 
+        _keunig_coefs["Fr"].max(), 
+        100
+    )
     
     # for i in range(8):
     #     # 3. Evaluate the interpolator

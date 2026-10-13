@@ -36,6 +36,7 @@ DEFAULT_RESISTANCE_METHODS = {
         "Rp": savitsky.compute_Rp_savitsky,
         "Rsp": savitsky.compute_Rsp_savitsky,
         "Rtr": savitsky.compute_Rtr_savitsky,
+        "Raw": savitsky.compute_Raw_savitsky,
         "Fz": savitsky.compute_Fz_savitsky,     # portance verticale (torseur)
         # "My": savitsky.compute_My_savitsky,     # moment de tangage (torseur)
     },
@@ -58,7 +59,8 @@ cog = np.array([
 #     *load_stl(hullStl)
 # )
 
-T0, ref = 0., 0.200513
+# T0, ref = 0., 0.200513
+T0, ref = 0., 0.294
 # T0, ref = 0.01, 0.234148
 
 
@@ -76,13 +78,14 @@ hull = Hull(
 
 
 T = 3e-2
-trim = overhang + 2.
+trim = overhang + 2. + 2.
 
 T = opti.variable(init_guess=T)
-trim = opti.variable(init_guess=trim, lower_bound=overhang + 2.)
+# trim = opti.variable(init_guess=trim, lower_bound=overhang + 2.)
+# trim = opti.variable(init_guess=trim, lower_bound=0.)
 
 op_point = OperatingPoint(
-    stw=12.,
+    stw=14.,
     dz=-T,
     trim=-trim,
 )
@@ -123,7 +126,6 @@ opti.minimize(
 
 opti.subject_to([
     (volume * rho * 9.8066 + hull.resistance_components["Fz"] - ref * rho * 9.8066) == 0.,
-    trim > 2.,
 ])
 
 

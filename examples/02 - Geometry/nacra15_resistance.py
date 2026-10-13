@@ -9,7 +9,7 @@ import os
 
 import archibald.numpy as np
 
-from archibald.dynamics.hydro import holtrop, michell
+from archibald.dynamics.hydro import holtrop, michell, dsyhs
 from archibald.geometry import Hull, Sailboat, Rig, Sail, WingXSec, ThinAirfoil, Fin, Appendage, Airfoil
 from archibald.performance import OperatingPoint
 
@@ -108,10 +108,10 @@ nacra = Sailboat(
 # nacra.draw()
 
 op_point = OperatingPoint(
-    stw=10,
+    stw=12,
     twa=55,
     tws0=20,
-    heel=-6.,
+    heel=-8.0,
     mainsail_trim=-10,
     jib_trim=-15,
 )
@@ -165,13 +165,16 @@ for hull in hulls:
 #     print(nacra.hull_interaction['dR_hull'], nacra.hull_interaction['dR'])
 #     # print(nacra.forces["Fh"])
 #     print()
-nacra.draw()
+# nacra.draw()
 
 # # Slender hulls: Michell wave resistance for each hull (equivalent hull built
 # # from the hydrostatics) with the Holtrop friction, as a custom process.
 custom_process = {
-    "Rf": holtrop.compute_Rf_holtrop,
-    "Rw": michell.compute_Rw_michell,
+    # "Rf": holtrop.compute_Rf_holtrop,
+    "Rf": dsyhs.compute_Rf_dsyhs,
+    # "Rw": michell.compute_Rw_michell,
+    # "Rw": holtrop.compute_Rw_holtrop,
+    "Rw": dsyhs.compute_Rw_dsyhs,
     "Rtr": holtrop.compute_Rtr_holtrop,
 }
 

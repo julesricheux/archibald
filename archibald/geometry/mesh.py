@@ -21,6 +21,32 @@ def tall(array):
 def wide(array):
     return np.reshape(array, (1, -1))
 
+def smooth_clip(x, a, b, beta=10.0):
+    r"""
+    Smooth and differentiable clipping function bounded between [a, b] 
+    using np.softplus, suitable for gradient-based optimization (IPOPT).
+    
+    Parameters
+    ----------
+    x : float or ndarray, Input value(s) to clip.
+    a : float, Lower bound.
+    b : float, Upper bound.
+    beta : float, Steepness factor for the transition smoothing (higher = sharper).
+    
+    Returns
+    -------
+    float or ndarray, Smoothed and clipped values.
+    """
+    # 1. Smooth lower bound (smooth maximum with 'a')
+    # Equivalent to: max(x, a) smoothly smoothed out
+    x_lower = a + np.softplus(x - a, beta=beta)
+    
+    # 2. Smooth upper bound (smooth minimum with 'b')
+    # Derived via symmetry: min(y, b) = -max(-y, -b)
+    x_clipped = b - np.softplus(b - x_lower, beta=beta)
+    
+    return x_clipped
+
 def complete_base_from_waterplane_normal(
         normal: Union[np.ndarray, List, str] = "z",
     ):
@@ -1148,10 +1174,22 @@ class ArchibaldMesh(ArchibaldObject):
         ### Submerged volume and centre of buoyancy
         
         # total volume
-        volume = self.weighted_volume(
-            weight=weights,
-            ref_point=point,
-            recompute_tetrahedron_volumes=False,
+        volume = np.softplus(
+            self.weighted_volume(
+                weight=weights,
+                ref_point=point,
+                recompute_tetrahedron_volumes=False,
+            ),
+            beta=1e3,
+        )
+        volume = np.softplus(
+            self.weighted_volume(
+                weight=weights,
+                ref_point=point,
+                recompute_tetrahedron_volumes=False,
+                
+            ),
+            beta=1e12,
         )
         
         # average weighted tetrahedron center i.e. center of buoyancy
@@ -1306,6 +1344,15 @@ class ArchibaldMesh(ArchibaldObject):
         Cx  = Ax     / (Bwl * T        + 1e-12)   # midship section coefficient
         Cy  = Ay     / (Lwl * T        + 1e-12)   # longitudinal plane coefficient
         Cwp = Awp    / (Lwl  * Bwl      + 1e-12)   # waterplane area coefficient
+        
+        eps = 1e-3
+        beta = 1e3
+        # Smoothly bounded coefficients for IPOPT stability
+        Cb  = smooth_clip(Cb, eps, 1.0 - eps, beta=beta)  # block coefficient
+        Cp  = smooth_clip(Cp, eps, 0.92, beta=beta)  # prismatic coefficient
+        Cx  = smooth_clip(Cx, eps, 1.0 - eps, beta=beta)  # midship section coefficient
+        Cy  = smooth_clip(Cy, eps, 1.0 - eps, beta=beta)  # longitudinal plane coefficient
+        Cwp = smooth_clip(Cwp, eps, 1.0 - eps, beta=beta) # waterplane area coefficient
         
         ### Additional distances and lengths
         # u_fpp is measured from the waterplane reference point, so cob and cof

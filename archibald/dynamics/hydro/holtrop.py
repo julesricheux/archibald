@@ -11,6 +11,36 @@ import archibald.toolbox.units as u
 from archibald.toolbox.math_utils import ReLU
 from archibald.dynamics.hydro.common import Cf_hull, transom_resistance
 
+#%% HELPER
+
+#TODO move to share in toolbox, or NumPy
+
+def smooth_clip(x, a, b, beta=10.0):
+    r"""
+    Smooth and differentiable clipping function bounded between [a, b] 
+    using np.softplus, suitable for gradient-based optimization (IPOPT).
+    
+    Parameters
+    ----------
+    x : float or ndarray, Input value(s) to clip.
+    a : float, Lower bound.
+    b : float, Upper bound.
+    beta : float, Steepness factor for the transition smoothing (higher = sharper).
+    
+    Returns
+    -------
+    float or ndarray, Smoothed and clipped values.
+    """
+    # 1. Smooth lower bound (smooth maximum with 'a')
+    # Equivalent to: max(x, a) smoothly smoothed out
+    x_lower = a + np.softplus(x - a, beta=beta)
+    
+    # 2. Smooth upper bound (smooth minimum with 'b')
+    # Derived via symmetry: min(y, b) = -max(-y, -b)
+    x_clipped = b - np.softplus(b - x_lower, beta=beta)
+    
+    return x_clipped
+
 #%% INDIVIDUAL COEFFICIENTS
 
 def c_14(
@@ -414,14 +444,61 @@ def c_17(
     -------
     float, Coefficient c17 [-].
     """
-    Lbp_to_Bwl = np.softplus(Lbp / (Bwl + 1e-12) - 2, beta=1e3)
-    Lbp_to_Bwl = np.fmax(Lbp_to_Bwl, 1e-6)   # ← ADD THIS
+    safe_Lbp_to_Bwl = 1e-12 + np.softplus(Lbp / (Bwl + 1e-12) - 2, beta=1e3)
+    safe_Lbp = Lbp + 1e-12
     return (
         6919.3
-        * (Cx + 1e-12) ** (-1.3346)
-        * (volume / (Lbp + 1e-12) ** 3) ** 2.00977
-        * Lbp_to_Bwl ** 1.40692
+        * (Cx) ** (-1.3346)
+        * (volume / safe_Lbp ** 3) ** 2.00977
+        * safe_Lbp_to_Bwl ** 1.40692
     )
+
+# def c_17(
+#         Lbp,
+#         Bwl,
+#         volume,
+#         Cx,
+#         **kwargs,
+#     ):
+#     r"""Coefficient c17 used in high-speed wave-making resistance prediction.
+
+#     According to :cite:`holtropStatisticalReAnalysisResistance1984`, p. 272:
+
+#     .. math::
+#         c_{17} = 6919.3\,C_X^{-1.3346}
+#             \left(\frac{\nabla}{L^3}\right)^{2.00977}
+#             \left(\frac{L}{B} - 2\right)^{1.40692}
+
+#     Parameters
+#     ----------
+#     Lbp : float, Length between perpendiculars [m].
+#     Bwl : float, Waterline beam [m].
+#     volume : float, Displaced volume [m³].
+#     Cx : float, Midship section coefficient [-].
+
+#     Returns
+#     -------
+#     float, Coefficient c17 [-].
+#     """
+#     # 1. Guarantee strictly positive bases using softplus. 
+#     # Even if Cx, volume, or dimensions become negative or zero during extreme 
+#     # optimizer iterations, softplus smoothly floors them to a safe positive value (> 0).
+#     safe_Cx = 0.05 + np.softplus(Cx - 0.05, beta=50.0)
+#     safe_volume = volume
+#     safe_Lbp = 0.1 + np.softplus(Lbp - 0.1, beta=50.0)
+#     safe_Bwl = 0.05 + np.softplus(Bwl - 0.05, beta=50.0)
+
+#     # 2. Safely bound the L/B - 2 term above a positive epsilon
+#     lbp_to_bwl_ratio = safe_Lbp / safe_Bwl - 2.0
+#     safe_lbp_to_bwl = 1e-6 + np.softplus(lbp_to_bwl_ratio - 1e-6, beta=100.0)
+    
+#     # 3. Evaluate with guaranteed positive bases (no negative-power explosions)
+#     return (
+#         6919.3
+#         * safe_Cx ** (-1.3346)
+#         * (safe_volume / safe_Lbp ** 3) ** 2.00977
+#         * safe_lbp_to_bwl ** 1.40692
+#     )
 
 
 def m_1(

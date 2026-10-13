@@ -21,10 +21,14 @@ from archibald.dynamics.hydro.multihull_common import (
 # Bounds of the shape coefficients. Hydrostatics of a hull that is about to leave
 # the water (or just left it) give degenerate values (Cp < 0, Cp = 0, Cx > 1...),
 # for which the shape exponents p, q and r are not defined or diverge.
-CP_MIN, CP_MAX = 0.15, 0.92
-CX_MIN, CX_MAX = 0.40, 0.95
-T_FLOOR = 0.01      # [m] lowest draught used for the truncation of the integral
-S_MAX = 3.          # largest rescaling of the Kochin amplitude by the calibration
+CP_MIN, CP_MAX = 0.001, 0.999
+CX_MIN, CX_MAX = 0.001, 0.999
+T_FLOOR = 0.001      # [m] lowest draught used for the truncation of the integral
+S_MAX = 1.          # largest rescaling of the Kochin amplitude by the calibration
+# CP_MIN, CP_MAX = 0.15, 0.92
+# CX_MIN, CX_MAX = 0.40, 0.95
+# T_FLOOR = 0.01      # [m] lowest draught used for the truncation of the integral
+# S_MAX = 3.          # largest rescaling of the Kochin amplitude by the calibration
 
 #%% INDIVIDUAL COEFFICIENTS
 
@@ -198,14 +202,11 @@ def kochin_amplitude(
     array, Kochin amplitude A(u) [m²].
     """
     _k0 = k_0(stw=stw, g=g)
-
-    # Hull close to or out of the water: smooth floors and bounds, so that the
-    # amplitude (proportional to the draught) vanishes instead of diverging
+    
     Lwl = np.softplus(Lwl, beta=1e3)
     Bwl = np.softplus(Bwl, beta=1e3)
     T = np.softplus(T, beta=1e3)
-    Cp = smooth_clip(Cp, CP_MIN, CP_MAX)
-    Cx = smooth_clip(Cx, CX_MIN, CX_MAX)
+    
     p, q, r = p_exp(Cp), q_exp(Cx), r_exp(Cp)
     k = _k0 * np.sqrt(1. + u_nodes ** 2)
     a = _k0 * (1. + u_nodes ** 2)

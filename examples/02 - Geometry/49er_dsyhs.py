@@ -45,7 +45,7 @@ cog = np.array([
 #     *load_stl(hullStl)
 # )
 
-T0, ref = 0., 0.200513
+T0, ref = 0., 0.290513
 # T0, ref = 0.01, 0.234148
 
 #%%
@@ -54,10 +54,35 @@ overhang = 3.775 # deg for 49er
 
 opti = Opti()
 
-T = 0.0
-trim = 0.
+T = opti.variable(init_guess=0.)
+trim = 4
 
-stw = np.linspace(6., 14., 50)
+op_point = OperatingPoint(
+    dz=-T,
+    trim=-trim,
+)
+
+hull.mesh.transform(op_point)
+
+Fb, Mb = hull.compute_buoyancy(op_point)
+
+# opti.maximize(T)
+opti.subject_to([(Fb[2] - ref * 1025 * 9.8066) == 0.])
+
+sol = opti.solve()
+
+hull = Hull(
+    mesh=hullStl,
+)
+
+op_point = OperatingPoint(
+    dz=-sol(T),
+    trim=-trim,
+)
+
+hull.mesh.transform(op_point)
+
+stw = np.linspace(0., 18., 50)
 
 Rf = []
 Rw = []
@@ -68,11 +93,7 @@ for s in stw:
 
     op_point = OperatingPoint(
         stw=s,
-        dz=-T,
-        trim=-trim,
     )
-    
-    hull.mesh.transform(op_point)
     
     # hull.mesh.draw(
     #     draw_plane=True,
@@ -97,10 +118,12 @@ for s in stw:
     Rtr.append(hrc["Rtr"])
     R.append(hrc["_total"])
 
-Rf = np.asarray(Rf)
-Rw = np.asarray(Rw)
-Rtr = np.asarray(Rtr)
-R = np.asarray(R)
+g = 9.8066
+
+Rf = np.asarray(Rf) / g
+Rw = np.asarray(Rw) / g
+Rtr = np.asarray(Rtr) / g
+R = np.asarray(R) / g
 
 
 fig, ax = plt.subplots(figsize=(8, 5))
@@ -108,7 +131,8 @@ fig, ax = plt.subplots(figsize=(8, 5))
 b = 1.1228946447372437
 L = 4.8577
 
-stw = stw * 0.5144 / np.sqrt(b * 9.8066)
+# stw = stw * 0.5144 / np.sqrt(L * 9.8066)
+# stw = stw * 0.5144 / np.sqrt(b * 9.8066)
 
 ax.fill_between(
     stw,
@@ -148,7 +172,7 @@ ax.set_xlim(stw[0], stw[-1])
 ax.legend()
 
 plt.xlim(stw[0], stw[-1])
-plt.ylim(0, 300)
+plt.ylim(0, 70)
 
 fig.tight_layout()
 plt.show()

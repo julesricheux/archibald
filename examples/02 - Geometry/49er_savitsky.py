@@ -16,7 +16,7 @@ from archibald.toolbox.mesh_utils import load_stl
 
 from archibald.toolbox.math_utils import waterplane_normal
 
-from archibald.dynamics.hydro import savitsky, holtrop
+from archibald.dynamics.hydro import savitsky, holtrop, strip_theory
 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -36,6 +36,11 @@ DEFAULT_RESISTANCE_METHODS = {
     #     "Rtr": holtrop.compute_Rtr_holtrop,
     #     "Ra": holtrop.compute_Ra_holtrop,
     # },
+    "strip2dt": {
+        "Rf": strip_theory.compute_Rf_strip,
+        "Rw": strip_theory.compute_Rw_strip,
+        "Rtr": savitsky.compute_Rtr_savitsky,
+    },
     "savitsky": {
         "Rf": savitsky.compute_Rf_savitsky,
         "Rp": savitsky.compute_Rp_savitsky,
@@ -74,7 +79,7 @@ overhang = 3.775 # deg for 49er
 T = 0.133
 trim = 2. + overhang
 
-stw = np.linspace(6., 14., 50)
+stw = np.linspace(0., 18., 50)
 
 Rf = []
 Rp = []
@@ -103,6 +108,7 @@ for s in stw:
     hull.compute_resistance(
         op_point,
         method=DEFAULT_RESISTANCE_METHODS["savitsky"],
+        # method=DEFAULT_RESISTANCE_METHODS["strip2dt"],
         **{
             "trim": trim - overhang,
             "deadrise": 3.,
@@ -125,11 +131,13 @@ for s in stw:
     )
 
 
-Rf = np.asarray(Rf)
-Rp = np.asarray(Rp)
-Rtr = np.asarray(Rtr)
-Rsp = np.asarray(Rsp)
-R = np.asarray(R)
+g = 9.8066
+
+Rf = np.asarray(Rf) / g
+Rp = np.asarray(Rp) / g
+Rtr = np.asarray(Rtr) / g
+Rsp = np.asarray(Rsp) / g
+R = np.asarray(R) / g
 
 
 #%% PLOT
@@ -139,7 +147,8 @@ fig, ax = plt.subplots(figsize=(8, 5))
 b = 1.1228946447372437
 L = 4.8577
 
-stw = stw * 0.5144 / np.sqrt(b * 9.8066)
+# stw = stw * 0.5144 / np.sqrt(b * 9.8066)
+# stw = stw * 0.5144 / np.sqrt(L * 9.8066)
 
 ax.fill_between(
     stw,
@@ -186,7 +195,7 @@ ax.set_ylabel("Resistance [N]")
 ax.legend()
 
 plt.xlim(stw[0], stw[-1])
-plt.ylim(0, 300)
+plt.ylim(0, 70)
 
 fig.tight_layout()
 plt.show()
