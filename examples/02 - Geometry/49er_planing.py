@@ -66,7 +66,7 @@ cog = np.array([
 # )
 
 # T0, ref = 0., 0.200513
-T0, ref = 0., 0.294
+T0, ref = 0., 0.290513
 # T0, ref = 0.01, 0.234148
 
 
@@ -85,8 +85,8 @@ hull = Hull(
 stw = 18.
 # T = stw / 100
 # trim = stw / 2
-T = 0.
-trim = 0.
+T = 0.13089307922360902
+trim = 4.
 
 T = opti.variable(init_guess=T)
 # trim = opti.variable(init_guess=trim, lower_bound=overhang + 2.)

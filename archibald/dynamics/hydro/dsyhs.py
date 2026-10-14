@@ -176,6 +176,7 @@ def compute_Rf_dsyhs(
         Re,
         rho,
         Aws,
+        Atr,
         stw,
         **kwargs,
     ):
@@ -188,6 +189,7 @@ def compute_Rf_dsyhs(
     Re : float, Reynolds number (dimensionless).
     rho : float, Density of the water (typically in kg/m^3).
     Aws : float, Wetted surface area of the hull (typically in m^2).
+    Atr : float, Transom area of the hull (typically in m^2).
     stw : float,  Speed through water in knots.
         
     Returns:
@@ -197,7 +199,9 @@ def compute_Rf_dsyhs(
     """
     V = stw * u.kt # speed through water in m/s
     
-    Rf = 0.5 * Cf_hull(Re) * rho * Aws * V**2
+    A = Aws - Atr
+    
+    Rf = 0.5 * Cf_hull(Re) * rho * A * V**2
     return Rf
 
 

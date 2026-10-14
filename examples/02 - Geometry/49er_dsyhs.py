@@ -64,12 +64,16 @@ op_point = OperatingPoint(
 
 hull.mesh.transform(op_point)
 
-Fb, Mb = hull.compute_buoyancy(op_point)
+hull.compute_hydrostatics_properties(op_point)
+
+Fb, Mb = hull.compute_buoyancy(op_point, recompute_statics=False)
 
 # opti.maximize(T)
 opti.subject_to([(Fb[2] - ref * 1025 * 9.8066) == 0.])
 
 sol = opti.solve()
+
+print(sol(hull.hydrostatics_data["volume"]))
 
 hull = Hull(
     mesh=hullStl,
@@ -80,14 +84,18 @@ op_point = OperatingPoint(
     trim=-trim,
 )
 
-hull.mesh.draw(
-    draw_plane=True,
-    point=np.array([0, 0, 0]),
-    # backend="matplotlib",
-    # backend="plotly",
-)
+# hull.mesh.draw(
+#     draw_plane=True,
+#     point=np.array([0, 0, 0]),
+#     # backend="matplotlib",
+#     # backend="plotly",
+# )
 
 hull.mesh.transform(op_point)
+
+hull.compute_hydrostatics_properties(op_point)
+
+print(sol(hull.hydrostatics_data["volume"]))
 
 stw = np.linspace(0., 18., 50)
 
@@ -100,6 +108,8 @@ for s in stw:
 
     op_point = OperatingPoint(
         stw=s,
+        dz=-sol(T),
+        trim=-trim,
     )
     
     # hull.mesh.draw(
@@ -109,7 +119,7 @@ for s in stw:
     #     # backend="plotly",
     # )
     
-    hull.compute_hydrostatics_properties(op_point)
+    
     
     hull.compute_resistance(
         op_point,
@@ -179,7 +189,7 @@ ax.set_xlim(stw[0], stw[-1])
 ax.legend()
 
 plt.xlim(stw[0], stw[-1])
-plt.ylim(0, 70)
+plt.ylim(0, None)
 
 fig.tight_layout()
 plt.show()

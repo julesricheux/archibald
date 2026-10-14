@@ -746,6 +746,7 @@ def c_8(
         T,
         D,
         Aws,
+        Atr,
         **kwargs,
     ):
     r"""Coefficient c8 used in wake fraction prediction.
@@ -766,15 +767,18 @@ def c_8(
     T : float, Mean moulded draught [m].
     D : float, Propeller diameter [m].
     Aws : float, Wetted surface area [m²].
+    Aws : float, Transom area [m²].
 
     Returns
     -------
     float, Coefficient c8 [-].
     """
+    A = Aws - Atr
+    
     return np.where(
         Bwl / T < 5.0,
-        Bwl * Aws / (Lbp * D * T),
-        Aws * (7.0 * (Bwl / T) - 25.0) / (Lbp * D * ((Bwl / T) - 3.0))
+        Bwl * A / (Lbp * D * T),
+        A * (7.0 * (Bwl / T) - 25.0) / (Lbp * D * ((Bwl / T) - 3.0))
     )
 
 
@@ -784,6 +788,7 @@ def c_9(
         T,
         D,
         Aws,
+        Atr,
         **kwargs,
     ):
     r"""Coefficient c9 used in wake fraction prediction.
@@ -803,12 +808,13 @@ def c_9(
     T : float, Mean moulded draught [m].
     D : float, Propeller diameter [m].
     Aws : float, Wetted surface area [m²].
+    Atr : float, Transom area [m²].
 
     Returns
     -------
     float, Coefficient c9 [-].
     """
-    _c8 = c_8(Lbp=Lbp, Bwl=Bwl, T=T, D=D, Aws=Aws)
+    _c8 = c_8(Lbp=Lbp, Bwl=Bwl, T=T, D=D, Aws=Aws, Atr=Atr)
     return np.where(
         _c8 < 28.0,
         _c8,
@@ -1007,6 +1013,7 @@ def compute_Rf_holtrop(
         Bwl,
         T,
         Aws,
+        Atr,
         Cp,
         lcb,
         Csternchoice,
@@ -1028,6 +1035,7 @@ def compute_Rf_holtrop(
     Bwl : float, Waterline beam [m].
     T : float, Mean moulded draught [m].
     Aws : float, Wetted surface area [m²].
+    Atr : float, Transom area [m²].
     Cp : float, Prismatic coefficient [-].
     lcb : float, Longitudinal centre of buoyancy, as % of Lwl from midship [-].
     Csternchoice : int, Stern form (1=transom, 2=V-shaped, 3=U-shaped, 4=Spoon).
@@ -1051,14 +1059,16 @@ def compute_Rf_holtrop(
         Cstern = 10.
     else:
         Cstern = 0.
+        
+    A = Aws - Atr
 
     _1pk    = one_plus_k(Lwl=Lwl, Bwl=Bwl, T=T, volume=volume, Cp=Cp, Cstern=Cstern, lcb=lcb)
     _CA     = C_A(Lwl=Lwl)
     _Re     = Re(stw=stw, Lwl=Lwl, nu=nu)
     sigma_k = (_1pk - 1) * 0.046
 
-    dynamic_pressure = 0.5 * rho * Aws * Vms ** 2
-    Rf = _1pk * Cf_hull(_Re + 10.) * dynamic_pressure
+    dynamic_pressure = 0.5 * rho * A * Vms ** 2
+    Rf = _1pk * Cf_hull(_Re + 1e1) * dynamic_pressure
     
     if not np.is_casadi_type(Rf):
         Rf = np.squeeze(Rf)
@@ -1222,6 +1232,7 @@ def compute_Ra_holtrop(
         hB,
         rho,
         Aws,
+        Atr,
         Abt,
         uInterval=False,
         **kwargs,
@@ -1230,6 +1241,8 @@ def compute_Ra_holtrop(
     Calculates the model-ship correlation resistance RA.
     """
     Vms = stw * u.kt
+    
+    A = Aws - Atr
     
     CA = C_A(Lwl)
     sigmaCA = 0.00021
@@ -1240,7 +1253,7 @@ def compute_Ra_holtrop(
     #     RaMax = 0.5 * rho * Aws * (Vms ** 2) * (CA + 2*sigmaCA)
     #     return RaMin, RaMax
     
-    Ra = 0.5 * rho * Aws * (Vms ** 2) * CA
+    Ra = 0.5 * rho * A * (Vms ** 2) * CA
     return Ra
 
 #%% PROPELLER COEFFICIENTS
@@ -1252,6 +1265,7 @@ def w_single(
         T,
         T_A,
         Aws,
+        Atr,
         Cp,
         Cb,
         Cx,
@@ -1294,7 +1308,7 @@ def w_single(
     float, Wake fraction w [-].
     """
     _CV  = C_V(stw=stw, Lbp=Lbp, Bwl=Bwl, T=T, volume=volume, Cp=Cp, Cstern=Cstern, lcb=lcb, rho=rho, g=g)
-    _c9  = c_9(Lbp=Lbp, Bwl=Bwl, T=T, D=D, Aws=Aws)
+    _c9  = c_9(Lbp=Lbp, Bwl=Bwl, T=T, D=D, Aws=Aws, Atr=Atr)
     _c11 = c_11(T=T, D=D)
     _c19 = c_19(Cp=Cp, Cb=Cb, Cx=Cx)
     _c20 = c_20(Cstern=Cstern)
