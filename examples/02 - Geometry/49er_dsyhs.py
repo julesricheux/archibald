@@ -55,7 +55,7 @@ overhang = 3.775 # deg for 49er
 opti = Opti()
 
 T = opti.variable(init_guess=0.)
-trim = 4
+trim = 0
 
 op_point = OperatingPoint(
     dz=-T,
@@ -72,8 +72,6 @@ Fb, Mb = hull.compute_buoyancy(op_point, recompute_statics=False)
 opti.subject_to([(Fb[2] - ref * 1025 * 9.8066) == 0.])
 
 sol = opti.solve()
-
-print(sol(hull.hydrostatics_data["volume"]))
 
 hull = Hull(
     mesh=hullStl,
@@ -94,8 +92,6 @@ op_point = OperatingPoint(
 hull.mesh.transform(op_point)
 
 hull.compute_hydrostatics_properties(op_point)
-
-print(sol(hull.hydrostatics_data["volume"]))
 
 stw = np.linspace(0., 18., 50)
 
@@ -189,7 +185,7 @@ ax.set_xlim(stw[0], stw[-1])
 ax.legend()
 
 plt.xlim(stw[0], stw[-1])
-plt.ylim(0, None)
+plt.ylim(0, 90)
 
 fig.tight_layout()
 plt.show()

@@ -16,7 +16,7 @@ from archibald.toolbox.mesh_utils import load_stl
 
 from archibald.toolbox.math_utils import waterplane_normal
 
-from archibald.dynamics.hydro import savitsky, holtrop, dsyhs
+from archibald.dynamics.hydro import savitsky, holtrop, dsyhs, michell
 
 DEFAULT_RESISTANCE_METHODS = {
     "dsyhs": {
@@ -36,6 +36,10 @@ DEFAULT_RESISTANCE_METHODS = {
         "Rf": dsyhs.compute_Rf_dsyhs,
         "Rw": dsyhs.compute_Rw_dsyhs,
         "Rtr": dsyhs.compute_Rtr_dsyhs,
+        
+        # "Rw": michell.compute_Rw_michell,
+        # "Rw": holtrop.compute_Rw_holtrop,
+        # "Rw": lambda **kwargs: 0.,
         
         # "Rf": savitsky.compute_Rf_savitsky,
         # "Rtr": savitsky.compute_Rtr_savitsky,
@@ -85,12 +89,14 @@ hull = Hull(
 stw = 18.
 # T = stw / 100
 # trim = stw / 2
-T = 0.13089307922360902
+T = 0.13
 trim = 4.
+# T = 0.
+# trim = 0.
 
 T = opti.variable(init_guess=T)
 # trim = opti.variable(init_guess=trim, lower_bound=overhang + 2.)
-# trim = opti.variable(init_guess=trim)
+trim = opti.variable(init_guess=trim)
 
 op_point = OperatingPoint(
     stw=stw,
@@ -111,11 +117,11 @@ hull.compute_hydrostatics_properties(op_point)
 
 volume = hull.hydrostatics_data["volume"]
 
-tau = hull.mesh.keel_line_angle()["keel_angle"]
-# deadrise = hull.mesh.deadrise_angles(locations=(0.5,))['deadrise']
+tau = hull.mesh.keel_line_angle(window=(0, 0.5))["keel_angle"]
+deadrise = hull.mesh.deadrise_angles(locations=(0.66,))['deadrise']
 
 # tau = trim - overhang
-deadrise = 5.
+# deadrise = 5.0
 
 # volume = hull.mesh.hydrostatics(mesh_scale=)["volume"]
 
@@ -135,16 +141,16 @@ hrc = hull.resistance_components
 
 opti.minimize(
     hrc["Rf"] +
-    hrc["Rw"] +
+    # hrc["Rw"] +
     hrc["Rtr"] + 
-    # hrc["Rp"] +
-    # hrc["Rsp"] +
+    hrc["Rp"] +
+    hrc["Rsp"] +
     0.
 )
 
 opti.subject_to([
-    # (volume * rho * 9.8066 + hrc["Fz"] - ref * rho * 9.8066) == 0.,
-    (volume * rho * 9.8066 - ref * rho * 9.8066) == 0.,
+    (volume * rho * 9.8066 + hrc["Fz"] - ref * rho * 9.8066) == 0.,
+    # (volume * rho * 9.8066 - ref * rho * 9.8066) == 0.,
 ])
 
 

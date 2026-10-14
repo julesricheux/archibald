@@ -244,10 +244,11 @@ def compute_Rw_dsyhs(
     Rw     : float, Residuary resistance [N]
     """
     
-    Fr_max = _keunig_coefs["Fr"][-1]
+    # Fr_max = _keunig_coefs["Fr"][-1]
+    Fr_max = 0.6
     
-    excess_Fr = np.softplus(Fr - Fr_max, 1e3)
-    Fr = smooth_clip(Fr, 0, Fr_max, beta=20)
+    excess_Fr = np.softplus(Fr - Fr_max, 10)
+    Fr = smooth_clip(Fr, 0, Fr_max, beta=10)
     
     a = []
 

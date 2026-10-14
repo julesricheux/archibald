@@ -45,16 +45,24 @@ DEFAULT_RESISTANCE_METHODS = {
     #     # "My": savitsky.compute_My_savitsky,     # moment de tangage (torseur)
     # },
     "composite": {
-        # "Rf": dsyhs.compute_Rf_dsyhs,
-        "Rf": holtrop.compute_Rf_holtrop,
-        # "Rw": holtrop.compute_Rf_holtrop,
-        # "Rw": michell.compute_Rw_michell,
+        
+        "Rf": dsyhs.compute_Rf_dsyhs,
         "Rw": dsyhs.compute_Rw_dsyhs,
         "Rtr": dsyhs.compute_Rtr_dsyhs,
         
+        # "Rw": michell.compute_Rw_michell,
+        # "Rw": holtrop.compute_Rw_holtrop,
+        # "Rw": lambda **kwargs: 0.,
+        
+        # "Rf": savitsky.compute_Rf_savitsky,
+        # "Rtr": savitsky.compute_Rtr_savitsky,
+        
         "Rp": savitsky.compute_Rp_savitsky,
-        "Fz": savitsky.compute_Fz_savitsky,
-    }
+        "Rsp": savitsky.compute_Rsp_savitsky,
+        "Raw": savitsky.compute_Raw_savitsky,
+        "Fz": savitsky.compute_Fz_savitsky,     # portance verticale (torseur)
+        # "My": savitsky.compute_My_savitsky,     # moment de tangage (torseur)
+    },
 }
 
 #%% DATA
@@ -89,12 +97,13 @@ T0, ref = 0., 0.290513
 overhang = 3.775 # deg for 49er
 hullStl = r'data/49er_data/hull.stl'
 
-stw = np.arange(2, 19, 2)
+stw = np.arange(2, 19, 4)
 
 Rf = []
 Rw = []
 Rtr = []
 Rp = []
+Rsp = []
 R = []
 
 TRIM = []
@@ -109,13 +118,18 @@ for s in stw:
     
     # T = 3e-2
     # trim = overhang
-    T = 0.
-    trim = 0.
+    # T = 0.
+    # trim = 0.
+    # T = 0.13
+    # trim = 4.
     # # trim = 2.
+    T = s / 100
+    trim = s / 5.
+
     
     T = opti.variable(init_guess=T)
     # trim = opti.variable(init_guess=trim, lower_bound=overhang + 2.)
-    # trim = opti.variable(init_guess=trim, lower_bound=-1., upper_bound=s)
+    trim = opti.variable(init_guess=trim, lower_bound=0., upper_bound=20.)
     
     op_point = OperatingPoint(
         stw=s,
@@ -131,17 +145,19 @@ for s in stw:
     #     # backend="matplotlib",
     #     # backend="plotly",
     # )
-    
+        
     hull.compute_hydrostatics_properties(op_point)
     
-    volume = hull.mesh.hydrostatics()["volume"]
+    volume = hull.hydrostatics_data["volume"]
+    
+    tau = hull.mesh.keel_line_angle(window=(0.0, 0.5))["keel_angle"]
+    deadrise = hull.mesh.deadrise_angles(locations=(0.66,))['deadrise']
     
     hull.compute_resistance(
         op_point,
         method=DEFAULT_RESISTANCE_METHODS["composite"],
-        **{'Csternchoice': 1, 'Bulbchoice': 0},
-        # **{'trim': trim, 'deadrise': 3, "use_Aws": True},
-        **{'trim': trim - overhang, 'deadrise': 3, "use_Aws": True},
+        # **{'Csternchoice': 1, 'Bulbchoice': 0}
+        **{'trim': tau, 'deadrise': deadrise, "use_Aws": True}
     )
         
     froude =  op_point._stw / np.sqrt(hull.hydrostatics_data["Lwl"] * 9.8066)
@@ -162,17 +178,18 @@ for s in stw:
     
     # val = 1.
     
-    # Fz = hrc["Fz"] * val
-    # Fx = hrc["Rp"] * val
-    Fz = 0.
-    Fx = 0.
+    Fz = hrc["Fz"]
+    Fx = hrc["Rp"]
+    # Fz = 0.
+    # Fx = 0.
     
     opti.minimize(
         hrc["Rf"] +
-        hrc["Rw"] +
+        # hrc["Rw"] +
         hrc["Rtr"] + 
-        # hrc["Rsp"] +
-        Fx
+        Fx +
+        hrc["Rsp"] +
+        0.
     )
     
     opti.subject_to([
@@ -198,8 +215,10 @@ for s in stw:
     print()
     
     Rf.append(hrc["Rf"])
-    Rw.append(hrc["Rw"])
+    # Rw.append(hrc["Rw"])
+    Rw.append(0.)
     Rtr.append(hrc["Rtr"])
+    Rsp.append(hrc["Rsp"])
     Rp.append(sol(Fx))
     R.append(hrc["Rf"]+hrc["Rw"]+hrc["Rtr"]+sol(Fx))
 
@@ -209,6 +228,7 @@ Rf = np.asarray(Rf) / g
 Rw = np.asarray(Rw) / g
 Rtr = np.asarray(Rtr) / g
 Rp = np.asarray(Rp) / g
+Rsp = np.asarray(Rsp) / g
 R = np.asarray(R) / g
 
 #%%
@@ -253,12 +273,20 @@ ax.fill_between(
     label="Pressure resistance",
 )
 
-ax.plot(
+ax.fill_between(
     stw,
-    R,
-    linewidth=2,
-    label="Total resistance",
+    Rf + Rw + Rtr + Rp,
+    Rf + Rw + Rtr + Rp + Rsp,
+    alpha=0.5,
+    label="Spray resistance",
 )
+
+# ax.plot(
+#     stw,
+#     R,
+#     linewidth=2,
+#     label="Total resistance",
+# )
 
 ax.set_xlabel("STW [kn]")
 ax.set_ylabel("Resistance [N]")
