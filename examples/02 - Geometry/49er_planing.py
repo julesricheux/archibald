@@ -32,10 +32,16 @@ DEFAULT_RESISTANCE_METHODS = {
         "Ra": holtrop.compute_Ra_holtrop,
     },
     "savitsky": {
-        "Rf": savitsky.compute_Rf_savitsky,
+        
+        "Rf": dsyhs.compute_Rf_dsyhs,
+        "Rw": dsyhs.compute_Rw_dsyhs,
+        "Rtr": dsyhs.compute_Rtr_dsyhs,
+        
+        # "Rf": savitsky.compute_Rf_savitsky,
+        # "Rtr": savitsky.compute_Rtr_savitsky,
+        
         "Rp": savitsky.compute_Rp_savitsky,
         "Rsp": savitsky.compute_Rsp_savitsky,
-        "Rtr": savitsky.compute_Rtr_savitsky,
         "Raw": savitsky.compute_Raw_savitsky,
         "Fz": savitsky.compute_Fz_savitsky,     # portance verticale (torseur)
         # "My": savitsky.compute_My_savitsky,     # moment de tangage (torseur)
@@ -76,16 +82,18 @@ hull = Hull(
     mesh=hullStl,
 )
 
-
-T = 3e-2
-trim = overhang + 2. + 2.
+stw = 18.
+# T = stw / 100
+# trim = stw / 2
+T = 0.
+trim = 0.
 
 T = opti.variable(init_guess=T)
 # trim = opti.variable(init_guess=trim, lower_bound=overhang + 2.)
-# trim = opti.variable(init_guess=trim, lower_bound=0.)
+# trim = opti.variable(init_guess=trim)
 
 op_point = OperatingPoint(
-    stw=14.,
+    stw=stw,
     dz=-T,
     trim=-trim,
 )
@@ -101,13 +109,21 @@ hull.mesh.transform(op_point)
 
 hull.compute_hydrostatics_properties(op_point)
 
-volume = hull.mesh.hydrostatics()["volume"]
+volume = hull.hydrostatics_data["volume"]
+
+tau = hull.mesh.keel_line_angle()["keel_angle"]
+# deadrise = hull.mesh.deadrise_angles(locations=(0.5,))['deadrise']
+
+# tau = trim - overhang
+deadrise = 5.
+
+# volume = hull.mesh.hydrostatics(mesh_scale=)["volume"]
 
 hull.compute_resistance(
     op_point,
     method=DEFAULT_RESISTANCE_METHODS["savitsky"],
     # **{'Csternchoice': 1, 'Bulbchoice': 0}
-    **{'trim': trim - overhang, 'deadrise': 3, "use_Aws": True}
+    **{'trim': tau, 'deadrise': deadrise, "use_Aws": True}
 )
     
 froude =  op_point._stw / np.sqrt(hull.hydrostatics_data["Lwl"] * 9.8066)
@@ -119,13 +135,16 @@ hrc = hull.resistance_components
 
 opti.minimize(
     hrc["Rf"] +
-    hrc["Rp"] +
+    hrc["Rw"] +
     hrc["Rtr"] + 
-    hrc["Rsp"]
+    # hrc["Rp"] +
+    # hrc["Rsp"] +
+    0.
 )
 
 opti.subject_to([
-    (volume * rho * 9.8066 + hull.resistance_components["Fz"] - ref * rho * 9.8066) == 0.,
+    # (volume * rho * 9.8066 + hrc["Fz"] - ref * rho * 9.8066) == 0.,
+    (volume * rho * 9.8066 - ref * rho * 9.8066) == 0.,
 ])
 
 
@@ -141,11 +160,12 @@ sol = opti.solve()
 
 print(f"Trim =\t\t{sol(trim):.3f} deg")
 print(f"Draft =\t\t{sol(T):.3f} m")
-print(f"R =\t\t\t{sol(opti.f):.3f} N")
+# print(f"R =\t\t\t{sol(opti.f):.3f} N")
+print(f"R =\t\t\t{sol(opti.f)/9.8066:.3f} kg")
 print(f"Dyn lift% =\t{sol(hull.resistance_components['Fz'] / (ref * rho * 9.8066)) * 100:.3f} %")
-print(f"Disp. =\t\t{sol(volume * rho * 9.8066 + hull.resistance_components["Fz"])} N")
+print(f"Disp. =\t\t{sol(volume * rho * 9.8066 + hrc["Fz"])} N")
 print()
-for r in ["Rf", "Rp", "Rtr", "Rsp", "Fz"]:
+for r in ["Rf", "Rw", "Rp", "Rtr", "Rsp", "Fz"]:
     print(f"{r} = \t{sol(hrc[r]):.3f} N")
 
 # print(f"Volume : {sol(volume)*1000:.1f} L")

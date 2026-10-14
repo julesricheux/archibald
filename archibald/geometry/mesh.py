@@ -287,6 +287,156 @@ def wl_extents(
 
     return Lwl, Bwl, u_fpp, u_app, u_all, v_all, w_all
 
+def wet_clip_properties(P0, P1, P2, d0, d1, d2, eps=1e-9, return_segments=False):
+    r"""
+    Exact clipping of triangles by a plane, written without any branching so it
+    stays differentiable (CasADi MX/SX or numpy) and C1 in the signed distances.
+
+    Replaces the sigmoid/fmax face weights, whose gradient had spikes of several
+    mm of width at every vertex crossing (hence the endless equilibrium hunting).
+
+    Parameters
+    ----------
+    P0, P1, P2 : (nF, 3) triangle vertices
+    d0, d1, d2 : (nF,)   signed distances of the vertices (> 0 wet)
+
+    Returns
+    -------
+    f : (nF,)   exact wet area fraction of each triangle, in [0, 1]
+    m : (nF, 3) first moment of the wet part, i.e. f * (centroid of the wet part)
+                (expressed per unit triangle area). Dry part moment is G - m,
+                with G the triangle centroid.
+
+    Notes
+    -----
+    A pyramid whose apex is on the waterplane and whose base is a part of a
+    triangle has volume  f * (tetra volume of the whole triangle).  So the
+    submerged volume is exactly  sum(f * tet)  when ref_point lies on the plane.
+    """
+    # Branchless sort of the three distances (ties broken by index, so the order is always total)
+    B01 = 1.0 * (d0 <= d1)
+    B02 = 1.0 * (d0 <= d2)
+    B12 = 1.0 * (d1 <= d2)
+    r0 = (1. - B01) + (1. - B02)            # rank of each vertex: 0 = lowest d, 2 = highest d
+    r1 = B01 + (1. - B12)
+    r2 = B02 + B12
+
+    low = [1.0 * (r < 0.5) for r in (r0, r1, r2)]
+    top = [1.0 * (r > 1.5) for r in (r0, r1, r2)]
+    mid = [1. - l - t for l, t in zip(low, top)]
+
+    pick  = lambda w, x: w[0] * x[0] + w[1] * x[1] + w[2] * x[2]
+    pickP = lambda w: tall(w[0]) * P0 + tall(w[1]) * P1 + tall(w[2]) * P2
+
+    D = (d0, d1, d2)
+    a, b, c = pick(low, D), pick(mid, D), pick(top, D)        # a <= b <= c
+    Pa, Pb, Pc = pickP(low), pickP(mid), pickP(top)
+    G = (P0 + P1 + P2) / 3.
+
+    # Case "only the highest vertex is wet" (c > 0 >= b): small wet corner triangle at Pc
+    ta = c / np.fmax(c - a, eps)
+    tb = c / np.fmax(c - b, eps)
+    f_top = ta * tb
+    m_top = tall(f_top) * (Pc + (Pc + tall(ta) * (Pa - Pc)) + (Pc + tall(tb) * (Pb - Pc))) / 3.
+
+    # Case "two vertices are wet" (a < 0 < b): small dry corner triangle at Pa
+    sb = -a / np.fmax(b - a, eps)
+    sc = -a / np.fmax(c - a, eps)
+    g = sb * sc                                                # dry fraction
+    cd = (Pa + (Pa + tall(sb) * (Pb - Pa)) + (Pa + tall(sc) * (Pc - Pa))) / 3.
+    f_two = 1. - g
+    m_two = G - tall(g) * cd
+
+    # Mutually exclusive selectors
+    s_dry = 1.0 * (c <= 0.)
+    s_wet = (1. - s_dry) * (1.0 * (a >= 0.))
+    s_mix = (1. - s_dry) * (1. - s_wet)
+    s_top = s_mix * (1.0 * (b <= 0.))
+    s_two = s_mix * (1. - 1.0 * (b <= 0.))
+
+    f = s_wet + s_top * f_top + s_two * f_two
+    m = tall(s_wet) * G + tall(s_top) * m_top + tall(s_two) * m_two
+    if not return_segments:
+        return f, m
+
+    # Waterline segment cut by the plane in each crossed face (the two corner points computed above).
+    # Its length goes to 0 when the plane reaches a vertex, so the waterline polyline is continuous.
+    S1 = tall(s_top) * (Pc + tall(ta) * (Pa - Pc)) + tall(s_two) * (Pa + tall(sb) * (Pb - Pa))
+    S2 = tall(s_top) * (Pc + tall(tb) * (Pb - Pc)) + tall(s_two) * (Pa + tall(sc) * (Pc - Pa))
+    return f, m, S1, S2, s_top + s_two
+
+
+def soft_extremum_masked(x, mask, alpha, sign=1.):
+    """
+    Smooth max (sign=+1) or min (sign=-1) of x over the points where mask = 1.
+    Weighted mean of the points near the extremum, with weights exp(sign*alpha*x):
+    differentiable, and a point with mask = 0 can never contaminate the result.
+    ``alpha`` has units of 1/length: tie it to the mesh size (e.g. 30 / average edge length).
+    """
+    logits = sign * alpha * x - 1e6 * (1. - mask)
+    e = np.exp(logits - np.max(logits))
+    return np.sum(x * e) / (np.sum(e) + 1e-30)
+
+
+def soft_value_at_extremum(x, y, mask, alpha, sign=1.):
+    """Value of y at the (smooth) extremum of x over the points where mask = 1."""
+    logits = sign * alpha * x - 1e6 * (1. - mask)
+    e = np.exp(logits - np.max(logits))
+    return np.sum(y * e) / (np.sum(e) + 1e-30)
+
+
+def wl_entry_angle(S1, S2, mix, point, ux, uy, u_fpp, v_cl, lo, hi, edge_sharp, eps=1e-9):
+    r"""
+    Half entry angle (deg) of the waterline, from a weighted least-squares line  |y - y_cl| = a + b x
+    fitted to the waterline abaft the FPP, over the window  lo <= x <= hi  (x = distance abaft the FPP).
+
+    The waterline is the exact polyline cut by the plane in each crossed face (S1 -> S2), integrated
+    with a 2-point Gauss rule and weighted by segment length. It is therefore independent of how many
+    mesh edges happen to cross the plane, and continuous in draft, heel and trim. The window edges are
+    smooth (sigmoids), so no point ever enters or leaves abruptly.
+    """
+    to_u = lambda S: np.add(S, -point) @ tall(ux)
+    to_v = lambda S: np.add(S, -point) @ tall(uy)
+    u1, v1, u2, v2 = to_u(S1), to_v(S1), to_u(S2), to_v(S2)
+    length = tall(mix) * np.sqrt((u2 - u1) ** 2 + (v2 - v1) ** 2 + eps ** 2)
+
+    S0 = Su = Sv = Suu = Suv = 0.
+    for g in (0.5 - 0.5 / 3. ** 0.5, 0.5 + 0.5 / 3. ** 0.5):
+        x = u_fpp - (u1 + g * (u2 - u1))
+        y = np.sqrt((v1 + g * (v2 - v1) - v_cl) ** 2 + eps ** 2)
+        w = 0.5 * length * np.sigmoid((x - lo) * edge_sharp) * np.sigmoid((hi - x) * edge_sharp)
+        S0, Su, Sv = S0 + np.sum(w), Su + np.sum(w * x), Sv + np.sum(w * y)
+        Suu, Suv = Suu + np.sum(w * x * x), Suv + np.sum(w * x * y)
+
+    b = (S0 * Suv - Su * Sv) / (S0 * Suu - Su ** 2 + 1e-6 * S0 ** 2 * (hi - lo) ** 2 + 1e-30)
+    return np.arctand(b)
+
+
+def wl_crossing_extents(P0, P1, P2, d0, d1, d2, point, ux, uy, alpha):
+    """
+    Waterline extents from the actual edge/waterplane crossing points (no vertex
+    window, no dependence on the reference point). Soft extrema smooth the
+    switch of the extreme point from one edge to another.
+
+    Returns Lwl, Bwl, u_fpp, u_app (all relative to ``point`` along ux / uy), then the pooled
+    crossing points u, v (3*nF, 1) and their 0/1 crossing mask k (3*nF, 1).
+    """
+    us, vs, cr = [], [], []
+    for (Pi, Pj, di, dj) in ((P0, P1, d0, d1), (P1, P2, d1, d2), (P2, P0, d2, d0)):
+        wi, wj = 1.0 * (di > 0.), 1.0 * (dj > 0.)
+        crossing = wi * (1. - wj) + (1. - wi) * wj                       # edge crosses the plane
+        cr.append(tall(crossing))
+        den = di - dj
+        t = crossing * di * den / (den ** 2 + 1e-20)                     # t = 0 on non-crossing edges: no huge extrapolated points
+        Q = np.add(Pi + tall(t) * (Pj - Pi), -point)
+        us.append(Q @ tall(ux))
+        vs.append(Q @ tall(uy))
+    u, v, k = (np.concatenate(x, axis=0) for x in (us, vs, cr))
+
+    u_max, u_min = soft_extremum_masked(u, k, alpha, 1.), soft_extremum_masked(u, k, alpha, -1.)
+    v_max, v_min = soft_extremum_masked(v, k, alpha, 1.), soft_extremum_masked(v, k, alpha, -1.)
+    return u_max - u_min, v_max - v_min, u_max, u_min, u, v, k
+
 #%% CLASSES
 
 class ArchibaldPolygon(ArchibaldObject):
@@ -1403,6 +1553,227 @@ class ArchibaldMesh(ArchibaldObject):
         h["hB"] = T/2.
         
         return h
+    
+    def _attitude_frame(
+            self,
+            point,
+            normal,
+            soft_alpha,
+            mesh_scale,
+        ):
+        """Waterplane frame, vertex depths and waterline extents shared by keel_line_angle and deadrise_angles."""
+        if type(normal) is str:
+            normal = axis_string_to_array(normal)
+        
+        point = wide(np.array(point))
+        normal = wide(np.array(normal))
+        normal = normal / np.sqrt(np.sum(normal ** 2))
+        ux, uy, _ = complete_base_from_waterplane_normal(normal)
+        
+        vdist = -self.vertices_distances_to_plane(point, normal)    # depth below the waterplane, > 0 wet
+        fdist = vdist[self.faces].reshape((self.n_faces, 3))
+        
+        Lm = self.average_length if mesh_scale is None else mesh_scale
+        alpha = soft_alpha / Lm
+        
+        Lwl, _, u_fpp, u_app, _, _, _ = wl_crossing_extents(
+            self._v0, self._v1, self._v2,
+            fdist[:, 0], fdist[:, 1], fdist[:, 2],
+            point, ux, uy,
+            alpha=alpha,
+        )
+        return point, normal, ux, uy, vdist, Lm, alpha, Lwl, u_fpp, u_app
+    
+    def keel_line_angle(
+            self,
+            point: Union[np.ndarray, List] = np.zeros(3),
+            normal: Union[np.ndarray, List, str] = "z",
+            window: tuple = (0., 0.5),
+            n_stations: int = 24,
+            soft_alpha: float = 30.,
+            keel_sharpness: float = 100.,
+            mesh_scale: float = None,
+        ):
+        """
+        Angle (deg) between the keel line and the horizontal (the waterplane), measured from the
+        bottom of the transom. Positive when the keel line rises towards the bow.
+
+        - Keel line: lower envelope of the bottom (downward-facing) faces, i.e. at each longitudinal
+          station the deepest point of the surface. Each face edge is interpolated at the station and a
+          smooth maximum is taken, so the result does not depend on the vertex spacing.
+        - Bottom of the transom: deepest point of the transom faces (faces looking aft). If the hull has no
+          transom, the aft end of the keel line is used instead.
+        - A straight line anchored at the bottom of the transom is fitted by least squares to the keel
+          line at ``n_stations`` stations spread over ``window`` (fractions of Lwl forward of the transom).
+        Everything is expressed in the waterplane frame, so heel and trim are included.
+
+        Parameters
+        ----------
+        window         : (lo, hi), fractions of Lwl forward of the transom bottom over which the line is fitted
+        n_stations     : number of stations (>= 2)
+        keel_sharpness : the smooth maxima use ``keel_sharpness * soft_alpha / mesh_scale``. Higher is more
+                         accurate (less bias); the keel envelope does not switch edges in normal use,
+                         so a high value does not hurt smoothness.
+
+        Returns
+        -------
+        dict : keel_angle (deg), transom_bottom_depth (depth of the transom bottom below the waterplane),
+               u_transom, keel_u / keel_depth ((n_stations, 1) profile, u measured from ``point``).
+
+        Notes
+        -----
+        The lowest surfaces of the mesh are taken as the keel: fins, bulbs or rudders that are part of the
+        mesh would be picked up too.
+        
+        """
+        point, normal, ux, uy, vdist, Lm, alpha, Lwl, u_fpp, u_app = self._attitude_frame(
+            point, normal, soft_alpha, mesh_scale
+        )
+        alpha = keel_sharpness * alpha
+        if self._data['cross_product'] is None:
+            self.compute_cross_product()
+        
+        u_v = np.add(self.vertices, -point) @ tall(ux)
+        
+        cp = self._data['cross_product']
+        n_u, n_z = cp @ tall(ux), cp @ tall(normal)
+        n_abs = np.sqrt(n_u ** 2 + (cp @ tall(uy)) ** 2 + n_z ** 2 + 1e-24)
+        bottom = 1.0 * ((-n_z / n_abs) > 0.3)           # faces looking downward
+        transom = 1.0 * ((-n_u / n_abs) > 0.5)          # faces looking aft
+        
+        # vertices of every face, (nF, 1) each
+        fu = [u_v[self.faces[:, k]] for k in range(3)]
+        fd = [vdist[self.faces[:, k]] for k in range(3)]
+        
+        # candidate edges of the bottom: the 3 edges of each bottom face
+        ui = np.concatenate([fu[0], fu[1], fu[2]], axis=0)
+        uj = np.concatenate([fu[1], fu[2], fu[0]], axis=0)
+        di = np.concatenate([fd[0], fd[1], fd[2]], axis=0)
+        dj = np.concatenate([fd[1], fd[2], fd[0]], axis=0)
+        bmask = np.concatenate([bottom, bottom, bottom], axis=0)
+        ulo, uhi = np.fmin(ui, uj), np.fmax(ui, uj)
+        du_e, dd_e = uj - ui, dj - di
+        
+        def keel_depth(u_k):
+            inside = bmask * (1.0 * (ulo <= u_k)) * (1.0 * (u_k < uhi))   # edges crossing the station
+            t = (u_k - ui) * du_e / (du_e ** 2 + 1e-24)                   # position along the edge
+            cand = di + inside * t * dd_e                                 # depth of the surface along the edge
+            return soft_extremum_masked(cand, inside, alpha, 1.)
+        
+        # bottom of the transom: deepest vertex of the transom faces
+        tu = np.concatenate(fu, axis=0)
+        td = np.concatenate(fd, axis=0)
+        tmask = np.concatenate([transom, transom, transom], axis=0)
+        has_transom = np.sum(transom) > 0.5
+        
+        D_tr = soft_extremum_masked(td, tmask, alpha, 1.)
+        u_tr = soft_value_at_extremum(td, tu, tmask, alpha, 1.)
+        
+        # no transom: aft end of the keel line
+        u_fb = soft_extremum_masked(tu, np.concatenate([bottom, bottom, bottom], axis=0), alpha, -1.)
+        D_fb = keel_depth(u_fb)
+        
+        u_tb = np.where(has_transom, u_tr, u_fb)
+        D0 = np.where(has_transom, D_tr, D_fb)
+        
+        us, Ds = [], []
+        num = den = 0.
+        for k in range(n_stations):
+            s_k = window[0] + (window[1] - window[0]) * k / (n_stations - 1)
+            u_k = u_tb + s_k * Lwl
+            D_k = D0 if (k == 0 and window[0] == 0.) else keel_depth(u_k)
+            us.append(tall(u_k)); Ds.append(tall(D_k))
+            num = num + (u_k - u_tb) * (D_k - D0)
+            den = den + (u_k - u_tb) ** 2
+        
+        slope = num / (den + 1e-30)                                       # d(depth)/du, anchored at the transom bottom
+        
+        return {
+            "keel_angle": np.arctand(-slope),
+            "transom_bottom_depth": D0,
+            "u_transom": u_tb,
+            "keel_u": np.concatenate(us, axis=0),
+            "keel_depth": np.concatenate(Ds, axis=0),
+        }
+    
+    def deadrise_angles(
+            self,
+            point: Union[np.ndarray, List] = np.zeros(3),
+            normal: Union[np.ndarray, List, str] = "z",
+            locations: tuple = (0., 0.25, 0.5, 0.75),
+            max_angle: float = 60.,
+            bandwidth: tuple = (0.03, 1.5),
+            soft_alpha: float = 30.,
+            mesh_scale: float = None,
+        ):
+        """
+        Deadrise angle (deg) of the wetted bottom at several longitudinal locations.
+
+        At a station, the deadrise is the slope of the transverse section of the bottom, i.e.
+        atan(|n_y| / |n_z|) of the face normals expressed in the waterplane frame (so heel and trim are
+        included and it is exact for a prismatic V bottom). Wet bottom faces (area x exact wet fraction,
+        facing downward, steeper than ``max_angle`` excluded smoothly so that topsides and transom do not
+        count) are averaged with a Gaussian kernel in the longitudinal position and a local linear
+        correction, so the value is accurate at the ends (transom) as well as inside.
+
+        Parameters
+        ----------
+        locations : fractions of Lwl measured from the aft end of the waterline (0 = transom for an
+                    immersed transom, 1 = FPP)
+        max_angle : faces steeper than this (deg) are not part of the bottom
+        bandwidth : (a, b): kernel standard deviation = a * Lwl + b * mesh edge length
+
+        Returns
+        -------
+        dict : locations, deadrise ((n, 1) deg), u (longitudinal position of each location from ``point``)
+
+        Notes
+        -----
+        On a round-bilge hull this is the area-weighted mean slope of the bottom up to ``max_angle``.
+        
+        """
+        point, normal, ux, uy, vdist, Lm, alpha, Lwl, u_fpp, u_app = self._attitude_frame(
+            point, normal, soft_alpha, mesh_scale
+        )
+        if self._data['cross_product'] is None:
+            self.compute_cross_product()
+        if self._data['triangle_centers'] is None:
+            self.compute_triangle_centers()
+        if self._data['triangle_areas'] is None:
+            self.compute_triangle_areas()
+        
+        wet, _, _ = self._face_weights(point, normal)
+        
+        cp = self._data['cross_product']
+        n_u, n_v, n_z = cp @ tall(ux), cp @ tall(uy), cp @ tall(normal)       # (nF, 1) each
+        n_abs = np.sqrt(n_u ** 2 + n_v ** 2 + n_z ** 2 + 1e-24)
+        
+        beta_f = np.arctand(np.sqrt(n_v ** 2 + 1e-24) / np.sqrt(n_z ** 2 + 1e-24))   # transverse slope of each face
+        
+        tan_max = float(np.tan(np.radians(max_angle)))
+        w_down = np.sigmoid(((-n_z / n_abs) - 0.15) * 40.)                           # faces looking downward
+        w_flat = np.sigmoid((tan_max * (-n_z) - np.sqrt(n_v ** 2 + 1e-24)) / n_abs * 20.)  # bottom, not sides
+        W = tall(self._data['triangle_areas']) * tall(wet) * w_down * w_flat
+        
+        u_f = np.add(self._data['triangle_centers'], -point) @ tall(ux)
+        sigma = bandwidth[0] * Lwl + bandwidth[1] * Lm
+        
+        us, bs = [], []
+        for loc in locations:
+            u_loc = u_app + loc * Lwl
+            d = u_f - u_loc
+            Wk = W * np.exp(-0.5 * (d / sigma) ** 2)
+            S0, S1, S2 = np.sum(Wk), np.sum(Wk * d), np.sum(Wk * d * d)
+            T0, T1 = np.sum(Wk * beta_f), np.sum(Wk * d * beta_f)
+            S2r = S2 + 1e-3 * S0 * sigma ** 2                                 # ridge on the local slope
+            b0 = (T0 * S2r - S1 * T1) / (S0 * S2r - S1 ** 2 + 1e-30)
+            us.append(tall(u_loc)); bs.append(tall(b0))
+        
+        return {
+            "locations": np.array(locations),
+            "deadrise": np.concatenate(bs, axis=0),
+            "u": np.concatenate(us, axis=0),
+        }
     
     
     def aerostatics(

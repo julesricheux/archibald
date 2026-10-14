@@ -55,7 +55,7 @@ overhang = 3.775 # deg for 49er
 opti = Opti()
 
 T = opti.variable(init_guess=0.)
-trim = 3
+trim = 4
 
 op_point = OperatingPoint(
     dz=-T,
@@ -78,6 +78,13 @@ hull = Hull(
 op_point = OperatingPoint(
     dz=-sol(T),
     trim=-trim,
+)
+
+hull.mesh.draw(
+    draw_plane=True,
+    point=np.array([0, 0, 0]),
+    # backend="matplotlib",
+    # backend="plotly",
 )
 
 hull.mesh.transform(op_point)

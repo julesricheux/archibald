@@ -45,8 +45,9 @@ DEFAULT_RESISTANCE_METHODS = {
     #     # "My": savitsky.compute_My_savitsky,     # moment de tangage (torseur)
     # },
     "composite": {
-        "Rf": dsyhs.compute_Rf_dsyhs,
-        # "Rf": holtrop.compute_Rf_holtrop,
+        # "Rf": dsyhs.compute_Rf_dsyhs,
+        "Rf": holtrop.compute_Rf_holtrop,
+        # "Rw": holtrop.compute_Rf_holtrop,
         # "Rw": michell.compute_Rw_michell,
         "Rw": dsyhs.compute_Rw_dsyhs,
         "Rtr": dsyhs.compute_Rtr_dsyhs,
@@ -106,15 +107,15 @@ for s in stw:
         mesh=hullStl,
     )
     
-    T = -3e-2
-    # trim = 2. + overhang
+    # T = 3e-2
+    # trim = overhang
     T = 0.
     trim = 0.
-    # trim = 2.
+    # # trim = 2.
     
     T = opti.variable(init_guess=T)
     # trim = opti.variable(init_guess=trim, lower_bound=overhang + 2.)
-    trim = opti.variable(init_guess=trim, lower_bound=-1., upper_bound=s)
+    # trim = opti.variable(init_guess=trim, lower_bound=-1., upper_bound=s)
     
     op_point = OperatingPoint(
         stw=s,
@@ -139,8 +140,8 @@ for s in stw:
         op_point,
         method=DEFAULT_RESISTANCE_METHODS["composite"],
         **{'Csternchoice': 1, 'Bulbchoice': 0},
-        **{'trim': trim, 'deadrise': 3, "use_Aws": True},
-        # **{'trim': trim - overhang, 'deadrise': 3, "use_Aws": True},
+        # **{'trim': trim, 'deadrise': 3, "use_Aws": True},
+        **{'trim': trim - overhang, 'deadrise': 3, "use_Aws": True},
     )
         
     froude =  op_point._stw / np.sqrt(hull.hydrostatics_data["Lwl"] * 9.8066)
@@ -161,8 +162,10 @@ for s in stw:
     
     # val = 1.
     
-    Fz = hrc["Fz"] * val
-    Fx = hrc["Rp"] * val
+    # Fz = hrc["Fz"] * val
+    # Fx = hrc["Rp"] * val
+    Fz = 0.
+    Fx = 0.
     
     opti.minimize(
         hrc["Rf"] +

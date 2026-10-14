@@ -127,7 +127,8 @@ def tau(
     -------
     float, Effective trim angle tau [deg].
     """
-    return TAU_MIN + np.softplus(trim - TAU_MIN, beta=10.)
+    # return TAU_MIN + np.softplus(trim - TAU_MIN, beta=10.)
+    return np.softplus(trim, beta=1.)
 
 
 def C_v(
